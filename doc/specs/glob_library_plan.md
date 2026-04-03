@@ -28,7 +28,7 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 
 ## 3. Milestone 0: Development Foundation And Quality Harness
 
-- [ ] Create the initial public API sketch in code comments or stub types so the implementation has a stable target.
+- [x] Create the initial public API sketch in code comments or stub types so the implementation has a stable target.
 - [ ] Establish namespace layout under `XenoAtom.Glob`, `XenoAtom.Glob.Ignore`, `XenoAtom.Glob.IO`, and `XenoAtom.Glob.Git`.
 - [x] Replace placeholder files in the library and tests with meaningful structure.
 - [x] Set up test helper infrastructure for temporary directories, temporary repositories, and path corpus generation.
@@ -67,21 +67,21 @@ Exit criteria:
 
 ## 5. Milestone 2: Core Glob Parser And Matcher
 
-- [ ] Implement `GlobPattern` parsing for literals, `*`, `?`, character classes, escapes, and `**`.
-- [ ] Define a stable representation for compiled tokens and compiled segments.
-- [ ] Implement specialized matchers for literal path, literal name, suffix, prefix, single-segment wildcard, and general recursive glob.
+- [x] Implement `GlobPattern` parsing for literals, `*`, `?`, character classes, escapes, and `**`.
+- [x] Define a stable representation for compiled tokens and compiled segments.
+- [x] Implement specialized matchers for literal path, literal name, suffix, prefix, single-segment wildcard, and general recursive glob.
 - [ ] Add directory-aware matching hooks needed by ignore semantics.
-- [ ] Define invalid-pattern behavior and expose it through parse results rather than exceptions in normal control flow.
+- [x] Define invalid-pattern behavior and expose it through parse results rather than exceptions in normal control flow.
 - [ ] Add a small diagnostic representation for parser debugging that is not used in hot paths.
 
 Tests:
 
-- [ ] Unit tests for exact literal matches and mismatches.
-- [ ] Unit tests for `*`, `?`, and character class semantics.
-- [ ] Unit tests for escaped wildcard characters and escaped metacharacters.
-- [ ] Unit tests for `**/foo`, `foo/**`, `a/**/b`, and adjacent wildcard combinations.
-- [ ] Unit tests for segment-boundary behavior where `*` and `?` must not cross `/`.
-- [ ] Unit tests for invalid bracket expressions and trailing backslash handling.
+- [x] Unit tests for exact literal matches and mismatches.
+- [x] Unit tests for `*`, `?`, and character class semantics.
+- [x] Unit tests for escaped wildcard characters and escaped metacharacters.
+- [x] Unit tests for `**/foo`, `foo/**`, `a/**/b`, and adjacent wildcard combinations.
+- [x] Unit tests for segment-boundary behavior where `*` and `?` must not cross `/`.
+- [x] Unit tests for invalid bracket expressions and trailing backslash handling.
 - [ ] Property-style tests comparing specialized matcher results against the general matcher on generated cases.
 - [ ] Microbenchmarks for compile cost and single-pattern match throughput.
 
