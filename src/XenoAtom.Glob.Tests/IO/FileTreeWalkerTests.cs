@@ -176,6 +176,13 @@ public class FileTreeWalkerTests
     }
 
     [TestMethod]
+    public void Enumerate_ShouldHonorConfiguredCoreIgnoreCase()
+    {
+        AssertCaseSensitivityTraversal(ignoreCase: false);
+        AssertCaseSensitivityTraversal(ignoreCase: true);
+    }
+
+    [TestMethod]
     public void Enumerate_ShouldHonorCancellation()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -242,5 +249,29 @@ public class FileTreeWalkerTests
 
         visiblePaths.Sort(StringComparer.Ordinal);
         return visiblePaths.ToArray();
+    }
+
+    private static void AssertCaseSensitivityTraversal(bool ignoreCase)
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        git.RunChecked("config", "core.ignorecase", ignoreCase ? "true" : "false");
+
+        tempDirectory.WriteAllText(".gitignore", "*.TXT\n");
+        tempDirectory.WriteAllText("file.txt", string.Empty);
+        tempDirectory.WriteAllText("file.TXT", string.Empty);
+
+        var allFiles = new[] { ".gitignore", "file.txt", "file.TXT" };
+        var expected = QueryVisiblePathsFromGit(git, allFiles);
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+        var actual = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(expected, actual, $"Mismatch for core.ignorecase={ignoreCase}.");
     }
 }

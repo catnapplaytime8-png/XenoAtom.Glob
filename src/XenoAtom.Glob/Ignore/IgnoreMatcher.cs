@@ -11,8 +11,8 @@ namespace XenoAtom.Glob.Ignore;
 /// </summary>
 public sealed class IgnoreMatcher
 {
-    private static readonly PathStringComparison DefaultComparison = PathStringComparison.CurrentPlatformDefault;
     private readonly IReadOnlyList<IgnoreRuleSet> _ruleSets;
+    private readonly PathStringComparison _comparison;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="IgnoreMatcher"/> class.
@@ -20,7 +20,7 @@ public sealed class IgnoreMatcher
     /// </summary>
     /// <param name="ruleSets">The rule sets to evaluate in precedence order.</param>
     public IgnoreMatcher(params IgnoreRuleSet[] ruleSets)
-        : this((IReadOnlyList<IgnoreRuleSet>)ruleSets)
+        : this((IReadOnlyList<IgnoreRuleSet>)ruleSets, PathStringComparison.CurrentPlatformDefault)
     {
     }
 
@@ -30,9 +30,15 @@ public sealed class IgnoreMatcher
     /// </summary>
     /// <param name="ruleSets">The rule sets to evaluate in precedence order.</param>
     public IgnoreMatcher(IReadOnlyList<IgnoreRuleSet> ruleSets)
+        : this(ruleSets, PathStringComparison.CurrentPlatformDefault)
+    {
+    }
+
+    internal IgnoreMatcher(IReadOnlyList<IgnoreRuleSet> ruleSets, PathStringComparison comparison)
     {
         ArgumentNullException.ThrowIfNull(ruleSets);
         _ruleSets = ruleSets;
+        _comparison = comparison;
     }
 
     /// <summary>
@@ -112,7 +118,7 @@ public sealed class IgnoreMatcher
         {
             foreach (var rule in ruleSet.Rules)
             {
-                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, candidateLength, isDirectory, DefaultComparison))
+                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, candidateLength, isDirectory, _comparison))
                 {
                     continue;
                 }
@@ -137,7 +143,7 @@ public sealed class IgnoreMatcher
         {
             foreach (var rule in ruleSet.Rules)
             {
-                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, DefaultComparison))
+                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, _comparison))
                 {
                     continue;
                 }

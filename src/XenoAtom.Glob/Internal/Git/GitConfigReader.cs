@@ -34,6 +34,30 @@ internal static class GitConfigReader
         return string.IsNullOrEmpty(home) ? null : Path.Combine(home, ".config", "git", "ignore");
     }
 
+    public static bool? ResolveIgnoreCase(string gitDirectory)
+    {
+        foreach (var configPath in EnumerateCandidateConfigPaths(gitDirectory))
+        {
+            if (!File.Exists(configPath))
+            {
+                continue;
+            }
+
+            var value = TryReadCoreValue(configPath, "ignorecase");
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (TryParseBoolean(value, out var ignoreCase))
+            {
+                return ignoreCase;
+            }
+        }
+
+        return null;
+    }
+
     private static IEnumerable<string> EnumerateCandidateConfigPaths(string gitDirectory)
     {
         yield return Path.Combine(gitDirectory, "config");
@@ -53,6 +77,9 @@ internal static class GitConfigReader
     }
 
     private static string? TryReadCoreExcludesFile(string configPath)
+        => TryReadCoreValue(configPath, "excludesFile");
+
+    private static string? TryReadCoreValue(string configPath, string keyName)
     {
         string? currentSection = null;
         foreach (var rawLine in File.ReadLines(configPath))
@@ -81,7 +108,7 @@ internal static class GitConfigReader
             }
 
             var key = line[..separatorIndex].Trim();
-            if (!string.Equals(key, "excludesFile", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(key, keyName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -109,5 +136,27 @@ internal static class GitConfigReader
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return string.IsNullOrEmpty(home) ? path : Path.Combine(home, path[2..].Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    private static bool TryParseBoolean(string value, out bool result)
+    {
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "true":
+            case "yes":
+            case "on":
+            case "1":
+                result = true;
+                return true;
+            case "false":
+            case "no":
+            case "off":
+            case "0":
+                result = false;
+                return true;
+            default:
+                result = false;
+                return false;
+        }
     }
 }

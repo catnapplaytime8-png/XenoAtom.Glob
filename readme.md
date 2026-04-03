@@ -10,6 +10,7 @@ A gitignore compatible glob library.
 - Git-compatible ignore parsing and layered evaluation
 - Explicit ignore dialect selection for `.gitignore` and `.ignore`
 - Repository discovery for `.git` directories and gitfiles
+- Repository-aware ignore matching that honors `core.ignorecase`
 - Tree walking with ignore-aware directory pruning
 - Differential tests against the Git CLI for compatibility-sensitive behavior
 - Clear separation between ignore evaluation and tracked-file state from the Git index

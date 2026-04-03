@@ -30,20 +30,28 @@ public static class RepositoryDiscovery
             var dotGitPath = Path.Combine(currentDirectory, ".git");
             if (Directory.Exists(dotGitPath))
             {
+                var ignoreCase = GitConfigReader.ResolveIgnoreCase(dotGitPath);
                 context = new RepositoryContext(
                     currentDirectory,
                     dotGitPath,
-                    GitConfigReader.ResolveGlobalExcludePath(dotGitPath));
+                    GitConfigReader.ResolveGlobalExcludePath(dotGitPath),
+                    ignoreCase is bool ignoreCaseValue
+                        ? PathStringComparison.FromIgnoreCase(ignoreCaseValue)
+                        : PathStringComparison.CurrentPlatformDefault);
                 return true;
             }
 
             if (File.Exists(dotGitPath))
             {
                 var gitDirectory = ResolveGitFile(dotGitPath, currentDirectory);
+                var ignoreCase = GitConfigReader.ResolveIgnoreCase(gitDirectory);
                 context = new RepositoryContext(
                     currentDirectory,
                     gitDirectory,
-                    GitConfigReader.ResolveGlobalExcludePath(gitDirectory));
+                    GitConfigReader.ResolveGlobalExcludePath(gitDirectory),
+                    ignoreCase is bool ignoreCaseValue
+                        ? PathStringComparison.FromIgnoreCase(ignoreCaseValue)
+                        : PathStringComparison.CurrentPlatformDefault);
                 return true;
             }
 

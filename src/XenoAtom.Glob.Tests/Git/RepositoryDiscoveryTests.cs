@@ -3,6 +3,7 @@
 // See license.txt file in the project root for full license information.
 
 using XenoAtom.Glob.Git;
+using XenoAtom.Glob.Internal;
 using XenoAtom.Glob.Tests.TestInfrastructure;
 
 namespace XenoAtom.Glob.Tests.Git;
@@ -51,6 +52,19 @@ public class RepositoryDiscoveryTests
         var context = RepositoryDiscovery.Discover(tempDirectory.Path);
 
         Assert.AreEqual(Path.GetFullPath(globalIgnorePath), context.GlobalExcludePath);
+    }
+
+    [TestMethod]
+    public void Discover_ShouldResolveCoreIgnoreCaseFromConfig()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        git.RunChecked("config", "core.ignorecase", "false");
+
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+
+        Assert.AreEqual(PathStringComparison.Ordinal, context.PathComparison);
     }
 
     [TestMethod]

@@ -42,13 +42,13 @@ public sealed class FileTreeWalker
 
         if (repositoryContext is not null)
         {
-            startRelativeDirectory = GetRelativeDirectory(repositoryContext.WorkingTreeRoot, fullRootPath);
+            startRelativeDirectory = GetRelativeDirectory(repositoryContext.WorkingTreeRoot, fullRootPath, repositoryContext.PathComparison);
             rootRuleSets = MergeRuleSets(
                 repositoryContext.CreateInitialRuleSets(startRelativeDirectory),
                 options.AdditionalRuleSets);
         }
 
-        var rootIgnoreStack = new IgnoreStack(rootRuleSets);
+        var rootIgnoreStack = new IgnoreStack(rootRuleSets, repositoryContext?.PathComparison ?? PathStringComparison.CurrentPlatformDefault);
         return EnumerateCore(fullRootPath, startRelativeDirectory, rootIgnoreStack, options, repositoryContext);
     }
 
@@ -108,9 +108,9 @@ public sealed class FileTreeWalker
         return merged;
     }
 
-    private static string GetRelativeDirectory(string repositoryRoot, string rootPath)
+    private static string GetRelativeDirectory(string repositoryRoot, string rootPath, PathStringComparison comparison)
     {
-        if (string.Equals(repositoryRoot, rootPath, StringComparison.OrdinalIgnoreCase))
+        if (comparison.Equals(repositoryRoot, rootPath))
         {
             return string.Empty;
         }

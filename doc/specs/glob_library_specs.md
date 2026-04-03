@@ -153,6 +153,7 @@ Responsibilities:
 - Resolve `.git` directory versus gitfile indirection.
 - Resolve `.git/info/exclude`.
 - Resolve `core.excludesFile`.
+- Resolve repository-aware case comparison from `core.ignorecase` when present.
 - Carry repository-scoped compatibility options.
 
 ## 7. Public API Direction
@@ -322,14 +323,22 @@ This pruning constraint is mandatory for both correctness and performance.
 - `a/**/b` matches zero or more intermediate directories.
 - Other consecutive asterisks must follow Git's actual behavior and differential tests.
 
-### 10.6 Tracked files
+### 10.6 Case sensitivity
+
+Repository-aware ignore evaluation must honor Git's configured case-comparison behavior:
+
+- If `core.ignorecase` is configured for the repository, the matcher must use it.
+- If it is not configured, the implementation may fall back to the platform default comparison strategy.
+- Differential tests must cover both case-sensitive and case-insensitive repository configurations where the platform and Git installation permit them.
+
+### 10.7 Tracked files
 
 Ignore rules do not apply to already tracked files in Git. The library itself will not implement index tracking, but the Git integration layer must make this boundary explicit:
 
 - Pure ignore evaluation answers "would this path be ignored by the ignore engine?"
 - Repository-aware higher-level APIs may later add optional tracked-file integration, but it is out of scope for the first iteration.
 
-### 10.7 Symlink handling for ignore files
+### 10.8 Symlink handling for ignore files
 
 The Git compatibility layer must not follow a symlink when reading a working-tree `.gitignore` file, matching the Git documentation.
 

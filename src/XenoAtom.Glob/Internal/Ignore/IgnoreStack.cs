@@ -9,13 +9,16 @@ namespace XenoAtom.Glob.Internal;
 
 internal sealed class IgnoreStack
 {
-    public IgnoreStack(IReadOnlyList<IgnoreRuleSet> ruleSets)
+    public IgnoreStack(IReadOnlyList<IgnoreRuleSet> ruleSets, PathStringComparison comparison)
     {
         RuleSets = ruleSets;
-        Matcher = new IgnoreMatcher(ruleSets);
+        Comparison = comparison;
+        Matcher = new IgnoreMatcher(ruleSets, comparison);
     }
 
     public IReadOnlyList<IgnoreRuleSet> RuleSets { get; }
+
+    public PathStringComparison Comparison { get; }
 
     public IgnoreMatcher Matcher { get; }
 
@@ -27,6 +30,6 @@ internal sealed class IgnoreStack
         }
 
         var childRuleSets = repositoryContext.CreateChildRuleSets(RuleSets, relativeDirectory);
-        return ReferenceEquals(childRuleSets, RuleSets) ? this : new IgnoreStack(childRuleSets);
+        return ReferenceEquals(childRuleSets, RuleSets) ? this : new IgnoreStack(childRuleSets, Comparison);
     }
 }

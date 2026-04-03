@@ -12,11 +12,12 @@ namespace XenoAtom.Glob.Git;
 /// </summary>
 public sealed class RepositoryContext
 {
-    internal RepositoryContext(string workingTreeRoot, string gitDirectory, string? globalExcludePath)
+    internal RepositoryContext(string workingTreeRoot, string gitDirectory, string? globalExcludePath, PathStringComparison pathComparison)
     {
         WorkingTreeRoot = workingTreeRoot;
         GitDirectory = gitDirectory;
         GlobalExcludePath = globalExcludePath;
+        PathComparison = pathComparison;
     }
 
     /// <summary>
@@ -33,6 +34,8 @@ public sealed class RepositoryContext
     /// Gets the resolved global exclude path when available.
     /// </summary>
     public string? GlobalExcludePath { get; }
+
+    internal PathStringComparison PathComparison { get; }
 
     /// <summary>
     /// Gets the repository-scoped exclude file path.

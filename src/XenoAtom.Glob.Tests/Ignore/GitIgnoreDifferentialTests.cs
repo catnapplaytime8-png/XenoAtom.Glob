@@ -185,6 +185,13 @@ public class GitIgnoreDifferentialTests
     }
 
     [TestMethod]
+    public void GitDifferential_ShouldMatchConfiguredCoreIgnoreCaseBehavior()
+    {
+        AssertCaseSensitivityScenario(ignoreCase: false, "configured-case-sensitive");
+        AssertCaseSensitivityScenario(ignoreCase: true, "configured-case-insensitive");
+    }
+
+    [TestMethod]
     public void GitDifferential_ShouldMatchGeneratedRuleOrderingAndNegationScenarios()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -275,6 +282,7 @@ public class GitIgnoreDifferentialTests
 
     private static IgnoreMatcher BuildMatcherFromRepository(TemporaryDirectory tempDirectory)
     {
+        var context = XenoAtom.Glob.Git.RepositoryDiscovery.Discover(tempDirectory.Path);
         var ruleSets = new List<IgnoreRuleSet>();
         var globalExclude = tempDirectory.GetPath("global-ignore.txt");
         if (File.Exists(globalExclude))
@@ -311,6 +319,23 @@ public class GitIgnoreDifferentialTests
                 sourceKind: IgnoreRuleSourceKind.PerDirectory));
         }
 
-        return new IgnoreMatcher(ruleSets);
+        return new IgnoreMatcher(ruleSets, context.PathComparison);
+    }
+
+    private static void AssertCaseSensitivityScenario(bool ignoreCase, string scenarioName)
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        git.RunChecked("config", "core.ignorecase", ignoreCase ? "true" : "false");
+        tempDirectory.WriteAllText(".gitignore", "*.TXT\n");
+
+        var matcher = BuildMatcherFromRepository(tempDirectory);
+        var paths = new[] { "file.txt", "file.TXT" };
+        var gitResults = QueryGit(git, paths);
+        foreach (var path in paths)
+        {
+            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, scenarioName);
+        }
     }
 }

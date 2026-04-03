@@ -73,6 +73,7 @@ The implementation supports:
 - a `.git` gitfile that points to another Git directory
 - `.git/info/exclude`
 - `core.excludesFile`
+- repository-aware case comparison through `core.ignorecase`
 
 Current repository-aware scope:
 
