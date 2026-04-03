@@ -2,9 +2,11 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
-namespace XenoAtom.Glob;
+namespace XenoAtom.Glob.Internal;
 
-public class Class1
+internal enum PathNormalizationError
 {
-    // TODO
+    None,
+    AbsolutePathNotSupported,
+    ParentDirectorySegmentsNotSupported,
 }

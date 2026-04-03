@@ -2,14 +2,6 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
-namespace XenoAtom.Glob.Tests;
+using System.Runtime.CompilerServices;
 
-[TestClass]
-public class Class1Test
-{
-    [TestMethod]
-    public void TestSimple()
-    {
-        // TODO
-    }
-}
+[assembly: InternalsVisibleTo("XenoAtom.Glob.Tests")]

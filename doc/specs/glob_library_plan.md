@@ -30,34 +30,34 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 
 - [ ] Create the initial public API sketch in code comments or stub types so the implementation has a stable target.
 - [ ] Establish namespace layout under `XenoAtom.Glob`, `XenoAtom.Glob.Ignore`, `XenoAtom.Glob.IO`, and `XenoAtom.Glob.Git`.
-- [ ] Replace placeholder files in the library and tests with meaningful structure.
-- [ ] Set up test helper infrastructure for temporary directories, temporary repositories, and path corpus generation.
+- [x] Replace placeholder files in the library and tests with meaningful structure.
+- [x] Set up test helper infrastructure for temporary directories, temporary repositories, and path corpus generation.
 - [ ] Add a benchmark project or benchmark folder strategy for later BenchmarkDotNet coverage.
-- [ ] Add shared test utilities for path normalization, file layout creation, and Git CLI invocation.
+- [x] Add shared test utilities for path normalization, file layout creation, and Git CLI invocation.
 - [ ] Add CI expectations for unit tests, Git differential tests, and benchmarks that are safe to run in CI.
 - [ ] Require Git to be present in CI on supported platforms and fail fast with a clear message when the differential suite cannot run in environments where it is expected.
-- [ ] Add a small test helper that captures and prints `git --version` in differential test runs.
+- [x] Add a small test helper that captures and prints `git --version` in differential test runs.
 
 Exit criteria:
 
-- [ ] The repo has a clean test harness and no placeholder production types blocking implementation.
-- [ ] Developers can create isolated file-system and repository test fixtures with minimal boilerplate.
+- [x] The repo has a clean test harness and no placeholder production types blocking implementation.
+- [x] Developers can create isolated file-system and repository test fixtures with minimal boilerplate.
 
 ## 4. Milestone 1: Path Model And Normalization Primitives
 
-- [ ] Define the internal relative path contract described in [glob_library_specs.md](./glob_library_specs.md).
-- [ ] Implement path normalization that converts separators to `/` without using expensive general-purpose path APIs in hot paths.
-- [ ] Encode directory/file distinction separately from the path text.
-- [ ] Implement validation rules for relative paths used by the matcher and ignore engine.
-- [ ] Add low-allocation helpers for slicing segments from normalized paths.
+- [x] Define the internal relative path contract described in [glob_library_specs.md](./glob_library_specs.md).
+- [x] Implement path normalization that converts separators to `/` without using expensive general-purpose path APIs in hot paths.
+- [x] Encode directory/file distinction separately from the path text.
+- [x] Implement validation rules for relative paths used by the matcher and ignore engine.
+- [x] Add low-allocation helpers for slicing segments from normalized paths.
 - [ ] Decide and document the internal comparison strategy abstraction needed for case-sensitive versus case-insensitive scenarios.
 
 Tests:
 
-- [ ] Unit tests for separator normalization on Windows-style and Unix-style input.
-- [ ] Unit tests for duplicate separators, `.` segments, empty segments, and trailing separator handling.
-- [ ] Unit tests for directory flag handling independent of trailing slash input.
-- [ ] Unit tests for invalid input rejection behavior.
+- [x] Unit tests for separator normalization on Windows-style and Unix-style input.
+- [x] Unit tests for duplicate separators, `.` segments, empty segments, and trailing separator handling.
+- [x] Unit tests for directory flag handling independent of trailing slash input.
+- [x] Unit tests for invalid input rejection behavior.
 - [ ] Property-style tests for path normalization invariants on random segment combinations.
 
 Exit criteria:
