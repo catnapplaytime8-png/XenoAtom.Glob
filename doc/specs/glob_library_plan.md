@@ -261,29 +261,29 @@ This section is the quality backbone for the project and should be treated as ma
 
 ### 13.1 Unit Test Matrix
 
-- [ ] Path normalization tests
-- [ ] Glob parser tests
-- [ ] Glob matcher tests
-- [ ] `.gitignore` parser tests
-- [ ] Ignore rule precedence tests
-- [ ] Negation and pruning tests
-- [ ] Repository discovery tests
-- [ ] Traversal tests
+- [x] Path normalization tests
+- [x] Glob parser tests
+- [x] Glob matcher tests
+- [x] `.gitignore` parser tests
+- [x] Ignore rule precedence tests
+- [x] Negation and pruning tests
+- [x] Repository discovery tests
+- [x] Traversal tests
 - [ ] Public API guard tests for argument validation and XML-doc-covered behavior
 
 ### 13.2 Differential Compatibility Matrix
 
-- [ ] Compare ignore decisions to `git check-ignore --no-index`.
-- [ ] Compare winning source file, line number, and pattern text to Git verbose output.
-- [ ] Compare batch query behavior using `git check-ignore --no-index --stdin -z -v --non-matching`.
-- [ ] Cover nested `.gitignore` files with overrides.
-- [ ] Cover `.git/info/exclude`.
-- [ ] Cover `core.excludesFile`.
-- [ ] Cover worktree and gitfile repository layouts.
-- [ ] Cover line ending variants and escaped-space cases.
+- [x] Compare ignore decisions to `git check-ignore --no-index`.
+- [x] Compare winning source file, line number, and pattern text to Git verbose output.
+- [x] Compare batch query behavior using `git check-ignore --no-index --stdin -z -v --non-matching`.
+- [x] Cover nested `.gitignore` files with overrides.
+- [x] Cover `.git/info/exclude`.
+- [x] Cover `core.excludesFile`.
+- [x] Cover worktree and gitfile repository layouts.
+- [x] Cover line ending variants and escaped-space cases.
 - [ ] Cover case-sensitivity behavior on each supported platform.
-- [ ] Capture the Git version in test output and in failure diagnostics.
-- [ ] Fail the compatibility gate if Git and the library disagree on a supported scenario.
+- [x] Capture the Git version in test output and in failure diagnostics.
+- [x] Fail the compatibility gate if Git and the library disagree on a supported scenario.
 
 ### 13.3 Cross-Platform Matrix
 
