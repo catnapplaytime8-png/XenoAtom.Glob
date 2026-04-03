@@ -68,6 +68,23 @@ public class RepositoryDiscoveryTests
     }
 
     [TestMethod]
+    public void Discover_ShouldFallbackToGitCompatiblePlatformDefaultWhenCoreIgnoreCaseIsUnset()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        tempDirectory.WriteAllText(".gitignore", "*.TXT\n");
+
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+        var fileTxtResult = git.Run("check-ignore", "--no-index", "file.txt");
+        var expectedComparison = fileTxtResult.ExitCode == 0
+            ? PathStringComparison.OrdinalIgnoreCase
+            : PathStringComparison.Ordinal;
+
+        Assert.AreEqual(expectedComparison, context.PathComparison);
+    }
+
+    [TestMethod]
     public void Discover_ShouldMatchGitRevParse()
     {
         using var tempDirectory = new TemporaryDirectory();

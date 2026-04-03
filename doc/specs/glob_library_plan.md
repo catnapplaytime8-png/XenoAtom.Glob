@@ -288,7 +288,7 @@ This section is the quality backbone for the project and should be treated as ma
 - [x] Cover worktree and gitfile repository layouts.
 - [x] Cover line ending variants and escaped-space cases.
 - [x] Cover `core.ignorecase=true` and `core.ignorecase=false` repository behavior.
-- [ ] Cover case-sensitivity behavior on each supported platform.
+- [x] Cover case-sensitivity behavior on each supported platform.
 - [x] Capture the Git version in test output and in failure diagnostics.
 - [x] Fail the compatibility gate if Git and the library disagree on a supported scenario.
 

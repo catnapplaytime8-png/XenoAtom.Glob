@@ -172,15 +172,13 @@ public class GitIgnoreDifferentialTests
         git.RunChecked("init", "--quiet");
         tempDirectory.WriteAllText(".gitignore", "*.TXT\n");
 
-        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
-            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
-            sourcePath: ".gitignore"));
+        var matcher = BuildMatcherFromRepository(tempDirectory);
 
         var paths = new[] { "file.txt", "file.TXT" };
         var gitResults = QueryGit(git, paths);
         foreach (var path in paths)
         {
-            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, "case-sensitivity");
+            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, "case-sensitivity-current-platform-default");
         }
     }
 
