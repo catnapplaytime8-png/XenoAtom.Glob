@@ -38,6 +38,11 @@ internal static class PathNormalizer
             return PathNormalizationResult.FromPath(new NormalizedPath(string.Empty, inferredDirectory));
         }
 
+        if (TryReturnUnchangedPath(path, inferredDirectory, out var unchangedResult))
+        {
+            return unchangedResult;
+        }
+
         char[]? rentedBuffer = null;
         Span<char> destination = path.Length <= StackallocThreshold
             ? stackalloc char[path.Length]
@@ -99,6 +104,55 @@ internal static class PathNormalizer
                 ArrayPool<char>.Shared.Return(rentedBuffer);
             }
         }
+    }
+
+    private static bool TryReturnUnchangedPath(string path, bool inferredDirectory, out PathNormalizationResult result)
+    {
+        if (EndsWithSeparator(path))
+        {
+            result = default;
+            return false;
+        }
+
+        var segmentLength = 0;
+        for (var index = 0; index <= path.Length; index++)
+        {
+            if (index < path.Length && !IsSeparator(path[index]))
+            {
+                segmentLength++;
+                continue;
+            }
+
+            if (segmentLength == 0)
+            {
+                result = default;
+                return false;
+            }
+
+            var segment = path.AsSpan(index - segmentLength, segmentLength);
+            if (segment.SequenceEqual("."))
+            {
+                result = default;
+                return false;
+            }
+
+            if (segment.SequenceEqual(".."))
+            {
+                result = PathNormalizationResult.Failure(PathNormalizationError.ParentDirectorySegmentsNotSupported);
+                return true;
+            }
+
+            if (index < path.Length && path[index] == '\\')
+            {
+                result = default;
+                return false;
+            }
+
+            segmentLength = 0;
+        }
+
+        result = PathNormalizationResult.FromPath(new NormalizedPath(path, inferredDirectory));
+        return true;
     }
 
     private static string GetErrorMessage(PathNormalizationError error) => error switch
