@@ -292,7 +292,7 @@ This section is the quality backbone for the project and should be treated as ma
 ### 13.3 Cross-Platform Matrix
 
 - [x] Run the full suite on Windows.
-- [ ] Run the full suite on Linux.
+- [x] Run the full suite on Linux.
 - [ ] Run the full suite on macOS.
 - [x] Ensure platform-conditional expectations are explicit and localized in the tests.
 - [x] Add targeted tests for separator handling and platform-specific path edge cases.
