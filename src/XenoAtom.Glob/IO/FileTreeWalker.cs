@@ -3,6 +3,7 @@
 // See license.txt file in the project root for full license information.
 
 using System.Buffers;
+using System.Collections;
 using System.IO.Enumeration;
 
 using XenoAtom.Glob.Git;
@@ -16,6 +17,13 @@ namespace XenoAtom.Glob.IO;
 /// </summary>
 public sealed class FileTreeWalker
 {
+    private static readonly EnumerationOptions DirectoryEnumerationOptions = new()
+    {
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+        RecurseSubdirectories = false,
+    };
+
     /// <summary>
     /// Enumerates a directory tree according to the specified options.
     /// </summary>
@@ -53,25 +61,14 @@ public sealed class FileTreeWalker
     {
         options.CancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var entry in EnumerateDirectory(directoryPath))
+        foreach (var entry in EnumerateDirectory(
+            directoryPath,
+            relativeDirectory,
+            ignoreStack.Matcher,
+            repositoryContext,
+            options.FollowSymbolicLinks))
         {
             options.CancellationToken.ThrowIfCancellationRequested();
-
-            if (repositoryContext is not null && entry.Name == ".git")
-            {
-                continue;
-            }
-
-            if (!options.FollowSymbolicLinks && entry.IsReparsePoint)
-            {
-                continue;
-            }
-
-            var ignored = EvaluateIgnore(ignoreStack.Matcher, relativeDirectory, entry.Name, entry.IsDirectory);
-            if (ignored.IsIgnored)
-            {
-                continue;
-            }
 
             var relativePath = relativeDirectory.Length == 0 ? entry.Name : $"{relativeDirectory}/{entry.Name}";
             var fullPath = Path.Join(directoryPath, entry.Name);
@@ -122,27 +119,32 @@ public sealed class FileTreeWalker
         return PathNormalizer.NormalizeRelativePath(relativePath, isDirectory: true).Value;
     }
 
-    private static IEnumerable<RawFileSystemEntry> EnumerateDirectory(string directoryPath)
+    private static IEnumerable<RawFileSystemEntry> EnumerateDirectory(
+        string directoryPath,
+        string relativeDirectory,
+        IgnoreMatcher ignoreMatcher,
+        RepositoryContext? repositoryContext,
+        bool followSymbolicLinks)
+        => new DirectoryEnumerable(directoryPath, relativeDirectory, ignoreMatcher, repositoryContext, followSymbolicLinks);
+
+    private static bool ShouldIncludeEntry(
+        ref FileSystemEntry entry,
+        string relativeDirectory,
+        IgnoreMatcher ignoreMatcher,
+        RepositoryContext? repositoryContext,
+        bool followSymbolicLinks)
     {
-        var enumerationOptions = new EnumerationOptions
+        if (repositoryContext is not null && entry.FileName.SequenceEqual(".git"))
         {
-            AttributesToSkip = 0,
-            IgnoreInaccessible = false,
-            RecurseSubdirectories = false,
-        };
-
-        var enumerable = new FileSystemEnumerable<RawFileSystemEntry>(
-            directoryPath,
-            static (ref FileSystemEntry entry) => new RawFileSystemEntry(
-                entry.FileName.ToString(),
-                entry.IsDirectory,
-                (entry.Attributes & FileAttributes.ReparsePoint) != 0),
-            enumerationOptions);
-
-        foreach (var entry in enumerable)
-        {
-            yield return entry;
+            return false;
         }
+
+        if (!followSymbolicLinks && (entry.Attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            return false;
+        }
+
+        return !EvaluateIgnore(ignoreMatcher, relativeDirectory, entry.FileName, entry.IsDirectory).IsIgnored;
     }
 
     private static IgnoreEvaluationResult EvaluateIgnore(IgnoreMatcher matcher, string relativeDirectory, string entryName, bool isDirectory)
@@ -177,5 +179,66 @@ public sealed class FileTreeWalker
         }
     }
 
-    private readonly record struct RawFileSystemEntry(string Name, bool IsDirectory, bool IsReparsePoint);
+    private readonly record struct RawFileSystemEntry(string Name, bool IsDirectory);
+
+    private sealed class DirectoryEnumerable : IEnumerable<RawFileSystemEntry>
+    {
+        private readonly string _directoryPath;
+        private readonly string _relativeDirectory;
+        private readonly IgnoreMatcher _ignoreMatcher;
+        private readonly RepositoryContext? _repositoryContext;
+        private readonly bool _followSymbolicLinks;
+
+        public DirectoryEnumerable(
+            string directoryPath,
+            string relativeDirectory,
+            IgnoreMatcher ignoreMatcher,
+            RepositoryContext? repositoryContext,
+            bool followSymbolicLinks)
+        {
+            _directoryPath = directoryPath;
+            _relativeDirectory = relativeDirectory;
+            _ignoreMatcher = ignoreMatcher;
+            _repositoryContext = repositoryContext;
+            _followSymbolicLinks = followSymbolicLinks;
+        }
+
+        public IEnumerator<RawFileSystemEntry> GetEnumerator()
+            => new DirectoryEnumerator(
+                _directoryPath,
+                _relativeDirectory,
+                _ignoreMatcher,
+                _repositoryContext,
+                _followSymbolicLinks);
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed class DirectoryEnumerator : FileSystemEnumerator<RawFileSystemEntry>
+    {
+        private readonly string _relativeDirectory;
+        private readonly IgnoreMatcher _ignoreMatcher;
+        private readonly RepositoryContext? _repositoryContext;
+        private readonly bool _followSymbolicLinks;
+
+        public DirectoryEnumerator(
+            string directoryPath,
+            string relativeDirectory,
+            IgnoreMatcher ignoreMatcher,
+            RepositoryContext? repositoryContext,
+            bool followSymbolicLinks)
+            : base(directoryPath, DirectoryEnumerationOptions)
+        {
+            _relativeDirectory = relativeDirectory;
+            _ignoreMatcher = ignoreMatcher;
+            _repositoryContext = repositoryContext;
+            _followSymbolicLinks = followSymbolicLinks;
+        }
+
+        protected override bool ShouldIncludeEntry(ref FileSystemEntry entry)
+            => FileTreeWalker.ShouldIncludeEntry(ref entry, _relativeDirectory, _ignoreMatcher, _repositoryContext, _followSymbolicLinks);
+
+        protected override RawFileSystemEntry TransformEntry(ref FileSystemEntry entry)
+            => new(entry.FileName.ToString(), entry.IsDirectory);
+    }
 }

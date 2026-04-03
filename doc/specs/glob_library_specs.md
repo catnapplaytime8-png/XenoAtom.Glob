@@ -594,6 +594,7 @@ Benchmark separately:
 - Single-path matching
 - Ignore evaluation with shallow and deep rule stacks
 - Tree traversal on small, medium, and large directory corpora
+- Traversal scenarios where ignored root entries are skipped before path materialization
 - Worst-case wildcard-heavy rule sets
 
 Use BenchmarkDotNet and keep representative real-world corpora in a reproducible test asset strategy.

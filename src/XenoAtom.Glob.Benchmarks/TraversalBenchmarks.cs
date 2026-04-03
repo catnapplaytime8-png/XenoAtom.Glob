@@ -10,11 +10,13 @@ public class TraversalBenchmarks
     private BenchmarkRepositoryFixture _fixture = null!;
     private BenchmarkRepositoryFixture _deepIgnoreFixture = null!;
     private BenchmarkRepositoryFixture _prunedFixture = null!;
+    private BenchmarkRepositoryFixture _skippedFixture = null!;
     private FileTreeWalker _walker = null!;
     private FileTreeWalkOptions _noIgnoreOptions = null!;
     private FileTreeWalkOptions _shallowIgnoreOptions = null!;
     private FileTreeWalkOptions _deepIgnoreOptions = null!;
     private FileTreeWalkOptions _prunedOptions = null!;
+    private FileTreeWalkOptions _skippedOptions = null!;
 
     [Params("Small", "Medium", "Large")]
     public string CorpusSize { get; set; } = null!;
@@ -81,11 +83,24 @@ public class TraversalBenchmarks
         }
 
         var prunedRepository = _prunedFixture.InitializeGitRepository();
+        _skippedFixture = new BenchmarkRepositoryFixture();
+        _skippedFixture.WriteAllText(".gitignore", """
+            skip*/
+            *.tmp
+            """);
+        for (var i = 0; i < prunedDirectories; i++)
+        {
+            _skippedFixture.WriteAllText($"skip{i}/drop{i}.txt", string.Empty);
+            _skippedFixture.WriteAllText($"entry{i}.tmp", string.Empty);
+        }
+
+        var skippedRepository = _skippedFixture.InitializeGitRepository();
         _walker = new FileTreeWalker();
         _noIgnoreOptions = new FileTreeWalkOptions();
         _shallowIgnoreOptions = new FileTreeWalkOptions { RepositoryContext = repository };
         _deepIgnoreOptions = new FileTreeWalkOptions { RepositoryContext = deepRepository };
         _prunedOptions = new FileTreeWalkOptions { RepositoryContext = prunedRepository };
+        _skippedOptions = new FileTreeWalkOptions { RepositoryContext = skippedRepository };
     }
 
     [Benchmark]
@@ -100,11 +115,15 @@ public class TraversalBenchmarks
     [Benchmark]
     public int EnumerateWithPrunedDirectories() => _walker.Enumerate(_prunedFixture.RootPath, _prunedOptions).Count();
 
+    [Benchmark]
+    public int EnumerateWhereAllRootEntriesAreSkipped() => _walker.Enumerate(_skippedFixture.RootPath, _skippedOptions).Count();
+
     [GlobalCleanup]
     public void Cleanup()
     {
         _fixture.Dispose();
         _deepIgnoreFixture.Dispose();
         _prunedFixture.Dispose();
+        _skippedFixture.Dispose();
     }
 }

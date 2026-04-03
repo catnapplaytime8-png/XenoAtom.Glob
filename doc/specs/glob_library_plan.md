@@ -210,7 +210,7 @@ Exit criteria:
 
 - [x] Establish representative benchmark corpora: small, medium, large, deep, wildcard-heavy, and ignore-heavy.
 - [x] Measure allocations and throughput for path normalization, pattern compilation, matching, ignore evaluation, and traversal.
-- [ ] Identify high-allocation hot spots with profiler-backed inspection.
+- [x] Identify high-allocation hot spots with profiler-backed inspection.
 - [x] Introduce pooling or data-structure changes only when measurement justifies them.
 - [x] Verify optimizations do not change semantics by running the full correctness suite after each tuning step.
 - [x] Document expected performance characteristics and known tradeoffs.
@@ -220,6 +220,10 @@ Benchmark gates:
 - [x] Benchmark results are reproducible enough to detect regressions.
 - [ ] Allocation counts for skipped entries remain near-zero in the intended steady state.
 - [x] No optimization lands without a before-and-after measurement.
+
+Notes:
+
+- [ ] The dedicated skipped-entry traversal benchmark remains an explicit open gate until ignored entries can be skipped with genuinely negligible managed allocations in steady-state runs.
 
 ## 11. Milestone 8: Additional Ignore Dialect Hooks
 
