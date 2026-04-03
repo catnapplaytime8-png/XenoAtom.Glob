@@ -165,6 +165,7 @@ Proposed primary types:
 - `GlobMatcher`
 - `IgnoreRule`
 - `IgnoreRuleSet`
+- `IgnoreMatcher`
 - `IgnoreEvaluationResult`
 - `IgnoreOptions`
 - `GitIgnoreOptions`
@@ -182,6 +183,8 @@ Proposed top-level usage paths:
 4. Discover a repository context and run Git-compatible traversal.
 
 The API should favor static factory methods and `Try*` parsing methods over large constructor surfaces.
+
+For layered ignore evaluation, the public surface may expose an explicit matcher type that receives ordered rule sets and treats later rule sets as higher precedence than earlier ones.
 
 ## 8. Path Model
 

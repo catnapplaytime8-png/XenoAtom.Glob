@@ -92,61 +92,61 @@ Exit criteria:
 
 ## 6. Milestone 3: `.gitignore` Parser And Rule Compilation
 
-- [ ] Implement `.gitignore` line parsing with support for comments, escaped comments, negation, trailing slash, and escaped trailing spaces.
-- [ ] Preserve source metadata: source file, source kind, line number, original pattern text.
-- [ ] Support LF and CRLF inputs and files without a trailing newline.
-- [ ] Compile parsed ignore rules into immutable rule objects using the core glob engine.
-- [ ] Capture anchoring mode and directory-only behavior explicitly rather than inferring them at match time.
+- [x] Implement `.gitignore` line parsing with support for comments, escaped comments, negation, trailing slash, and escaped trailing spaces.
+- [x] Preserve source metadata: source file, source kind, line number, original pattern text.
+- [x] Support LF and CRLF inputs and files without a trailing newline.
+- [x] Compile parsed ignore rules into immutable rule objects using the core glob engine.
+- [x] Capture anchoring mode and directory-only behavior explicitly rather than inferring them at match time.
 - [ ] Provide a parser API that can read from text, spans, or streams without forcing the caller into one input model.
 
 Tests:
 
-- [ ] Unit tests for blank lines, comments, escaped `#`, escaped `!`, and escaped spaces.
-- [ ] Unit tests for leading slash, middle slash, no slash, and trailing slash semantics at parse level.
-- [ ] Unit tests for line numbering and source metadata preservation.
+- [x] Unit tests for blank lines, comments, escaped `#`, escaped `!`, and escaped spaces.
+- [x] Unit tests for leading slash, middle slash, no slash, and trailing slash semantics at parse level.
+- [x] Unit tests for line numbering and source metadata preservation.
 - [ ] Unit tests for invalid lines and invalid escape endings.
 - [ ] Corpus tests with curated `.gitignore` snippets covering common and obscure forms.
 
 Exit criteria:
 
-- [ ] Every parsed rule retains enough metadata to explain a winning match later.
-- [ ] Parse output is immutable and reusable across many match operations.
+- [x] Every parsed rule retains enough metadata to explain a winning match later.
+- [x] Parse output is immutable and reusable across many match operations.
 
 ## 7. Milestone 4: Ignore Evaluation Engine And Explanation Model
 
-- [ ] Implement ordered rule evaluation with last-match-wins behavior.
-- [ ] Implement layered rule sets with precedence matching the spec.
-- [ ] Implement per-directory relative evaluation semantics.
-- [ ] Implement negation behavior and the no-reinclude-below-pruned-directory rule.
-- [ ] Add `IgnoreEvaluationResult` with a minimal fast-path shape and optional expanded diagnostics.
+- [x] Implement ordered rule evaluation with last-match-wins behavior.
+- [x] Implement layered rule sets with precedence matching the spec.
+- [x] Implement per-directory relative evaluation semantics.
+- [x] Implement negation behavior and the no-reinclude-below-pruned-directory rule.
+- [x] Add `IgnoreEvaluationResult` with a minimal fast-path shape and optional expanded diagnostics.
 - [ ] Design `IgnoreStack` push/pop mechanics so descending into directories does not rebuild all parent state.
 
 Tests:
 
-- [ ] Unit tests for single-rule include and exclude outcomes.
-- [ ] Unit tests for multiple-rule ordering within one file.
-- [ ] Unit tests for precedence between parent `.gitignore`, child `.gitignore`, `.git/info/exclude`, and global excludes.
-- [ ] Unit tests for directory-only matches versus file matches.
-- [ ] Unit tests for basename-only patterns matching at any depth under the rule base.
-- [ ] Unit tests for negation and re-inclusion in reachable directories.
-- [ ] Unit tests proving that excluded parent directories prevent child re-inclusion from taking effect.
-- [ ] Unit tests for explanation payload: winning rule, source file, line number, and raw pattern.
+- [x] Unit tests for single-rule include and exclude outcomes.
+- [x] Unit tests for multiple-rule ordering within one file.
+- [x] Unit tests for precedence between parent `.gitignore`, child `.gitignore`, `.git/info/exclude`, and global excludes.
+- [x] Unit tests for directory-only matches versus file matches.
+- [x] Unit tests for basename-only patterns matching at any depth under the rule base.
+- [x] Unit tests for negation and re-inclusion in reachable directories.
+- [x] Unit tests proving that excluded parent directories prevent child re-inclusion from taking effect.
+- [x] Unit tests for explanation payload: winning rule, source file, line number, and raw pattern.
 
 Differential tests:
 
-- [ ] Introduce a Git-backed differential suite using `git check-ignore --no-index -v`.
-- [ ] Add batch-oriented differential helpers using `git check-ignore --no-index --stdin -z -v --non-matching`.
-- [ ] Compare both the ignore decision and the winning rule metadata against Git.
-- [ ] Include cases for `.gitignore`, `.git/info/exclude`, and `core.excludesFile`.
-- [ ] Include cases with nested `.gitignore` files and conflicting rules.
+- [x] Introduce a Git-backed differential suite using `git check-ignore --no-index -v`.
+- [x] Add batch-oriented differential helpers using `git check-ignore --no-index --stdin -z -v --non-matching`.
+- [x] Compare both the ignore decision and the winning rule metadata against Git.
+- [x] Include cases for `.gitignore`, `.git/info/exclude`, and `core.excludesFile`.
+- [x] Include cases with nested `.gitignore` files and conflicting rules.
 - [ ] Include cases with CRLF rule files, escaped spaces, escaped leading `!`, and complex `**` patterns.
 - [ ] Include cases that intentionally probe documented Git limitations such as failed re-inclusion below excluded directories.
 - [ ] Store fixture definitions in a reusable corpus format so regressions can be reproduced exactly.
 
 Exit criteria:
 
-- [ ] The engine matches Git for the curated compatibility corpus supported by the milestone.
-- [ ] Explanation mode reproduces enough metadata to diagnose mismatches against Git.
+- [x] The engine matches Git for the curated compatibility corpus supported by the milestone.
+- [x] Explanation mode reproduces enough metadata to diagnose mismatches against Git.
 
 ## 8. Milestone 5: Git-Aware Repository Discovery
 

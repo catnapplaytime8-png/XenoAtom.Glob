@@ -24,11 +24,44 @@ internal sealed class GitCli
 
     public GitCommandResult Run(params string[] arguments)
     {
+        return RunCore(null, arguments);
+    }
+
+    public GitCommandResult RunWithInput(string standardInput, params string[] arguments)
+    {
+        return RunCore(standardInput, arguments);
+    }
+
+    public GitCommandResult RunCheckedWithInput(string standardInput, params string[] arguments)
+    {
+        var result = RunWithInput(standardInput, arguments);
+        if (result.ExitCode == 0)
+        {
+            return result;
+        }
+
+        throw CreateCommandFailure(result);
+    }
+
+    public GitCommandResult RunChecked(params string[] arguments)
+    {
+        var result = Run(arguments);
+        if (result.ExitCode == 0)
+        {
+            return result;
+        }
+
+        throw CreateCommandFailure(result);
+    }
+
+    private GitCommandResult RunCore(string? standardInput, params string[] arguments)
+    {
         var startInfo = new ProcessStartInfo("git")
         {
             WorkingDirectory = WorkingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = standardInput is not null,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
@@ -44,6 +77,12 @@ internal sealed class GitCli
             throw new InvalidOperationException("Unable to start git process.");
         }
 
+        if (standardInput is not null)
+        {
+            process.StandardInput.Write(standardInput);
+            process.StandardInput.Close();
+        }
+
         var standardOutput = process.StandardOutput.ReadToEnd();
         var standardError = process.StandardError.ReadToEnd();
         process.WaitForExit();
@@ -55,14 +94,8 @@ internal sealed class GitCli
             string.Join(" ", startInfo.ArgumentList.Select(EscapeArgument)));
     }
 
-    public GitCommandResult RunChecked(params string[] arguments)
+    private InvalidOperationException CreateCommandFailure(GitCommandResult result)
     {
-        var result = Run(arguments);
-        if (result.ExitCode == 0)
-        {
-            return result;
-        }
-
         var builder = new StringBuilder();
         builder.AppendLine($"Git command failed: git {result.CommandLine}");
         builder.AppendLine($"Working directory: {WorkingDirectory}");
@@ -80,7 +113,7 @@ internal sealed class GitCli
             builder.Append(result.StandardError);
         }
 
-        throw new InvalidOperationException(builder.ToString());
+        return new InvalidOperationException(builder.ToString());
     }
 
     private static string GetVersionCore()
