@@ -12,6 +12,11 @@ namespace XenoAtom.Glob.Git;
 /// </summary>
 public sealed class RepositoryContext
 {
+    private readonly object _cacheLock = new();
+    private CachedIgnoreFile? _globalExcludeCache;
+    private CachedIgnoreFile? _infoExcludeCache;
+    private readonly Dictionary<string, CachedIgnoreFile> _perDirectoryCache = new(StringComparer.Ordinal);
+
     internal RepositoryContext(string workingTreeRoot, string gitDirectory, string? globalExcludePath, PathStringComparison pathComparison)
     {
         WorkingTreeRoot = workingTreeRoot;
@@ -45,20 +50,25 @@ public sealed class RepositoryContext
     internal IReadOnlyList<IgnoreRuleSet> CreateInitialRuleSets(string startRelativeDirectory)
     {
         var ruleSets = new List<IgnoreRuleSet>();
-        if (GlobalExcludePath is not null && File.Exists(GlobalExcludePath))
+        if (GlobalExcludePath is not null &&
+            TryLoadIgnoreFile(
+                GlobalExcludePath,
+                baseDirectory: string.Empty,
+                IgnoreRuleSourceKind.GlobalExclude,
+                ref _globalExcludeCache,
+                out var globalExcludeRuleSet))
         {
-            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
-                File.ReadAllText(GlobalExcludePath),
-                sourcePath: GlobalExcludePath,
-                sourceKind: IgnoreRuleSourceKind.GlobalExclude));
+            ruleSets.Add(globalExcludeRuleSet);
         }
 
-        if (File.Exists(InfoExcludePath))
+        if (TryLoadIgnoreFile(
+            InfoExcludePath,
+            baseDirectory: string.Empty,
+            IgnoreRuleSourceKind.RepositoryExclude,
+            ref _infoExcludeCache,
+            out var infoExcludeRuleSet))
         {
-            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
-                File.ReadAllText(InfoExcludePath),
-                sourcePath: InfoExcludePath,
-                sourceKind: IgnoreRuleSourceKind.RepositoryExclude));
+            ruleSets.Add(infoExcludeRuleSet);
         }
 
         if (startRelativeDirectory.Length == 0)
@@ -107,17 +117,89 @@ public sealed class RepositoryContext
             ? Path.Combine(WorkingTreeRoot, ".gitignore")
             : Path.Combine(WorkingTreeRoot, relativeDirectory.Replace('/', Path.DirectorySeparatorChar), ".gitignore");
 
-        if (!File.Exists(gitIgnorePath) || IsSymlink(gitIgnorePath))
+        if (!TryGetIgnoreFileMetadata(gitIgnorePath, out var lastWriteTimeUtc, out var length))
         {
             ruleSet = null!;
             return false;
         }
 
-        ruleSet = IgnoreRuleSet.ParseGitIgnore(
+        lock (_cacheLock)
+        {
+            if (_perDirectoryCache.TryGetValue(relativeDirectory, out var cachedRuleSet) &&
+                cachedRuleSet.LastWriteTimeUtc == lastWriteTimeUtc &&
+                cachedRuleSet.Length == length)
+            {
+                ruleSet = cachedRuleSet.RuleSet;
+                return true;
+            }
+        }
+
+        var parsedRuleSet = IgnoreRuleSet.ParseGitIgnore(
             File.ReadAllText(gitIgnorePath),
             baseDirectory: relativeDirectory,
             sourcePath: gitIgnorePath,
             sourceKind: IgnoreRuleSourceKind.PerDirectory);
+
+        lock (_cacheLock)
+        {
+            _perDirectoryCache[relativeDirectory] = new CachedIgnoreFile(lastWriteTimeUtc, length, parsedRuleSet);
+        }
+
+        ruleSet = parsedRuleSet;
+        return true;
+    }
+
+    private bool TryLoadIgnoreFile(
+        string path,
+        string baseDirectory,
+        IgnoreRuleSourceKind sourceKind,
+        ref CachedIgnoreFile? cache,
+        out IgnoreRuleSet ruleSet)
+    {
+        if (!TryGetIgnoreFileMetadata(path, out var lastWriteTimeUtc, out var length))
+        {
+            ruleSet = null!;
+            return false;
+        }
+
+        lock (_cacheLock)
+        {
+            if (cache is CachedIgnoreFile cachedRuleSet &&
+                cachedRuleSet.LastWriteTimeUtc == lastWriteTimeUtc &&
+                cachedRuleSet.Length == length)
+            {
+                ruleSet = cachedRuleSet.RuleSet;
+                return true;
+            }
+        }
+
+        var parsedRuleSet = IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(path),
+            baseDirectory: baseDirectory,
+            sourcePath: path,
+            sourceKind: sourceKind);
+
+        lock (_cacheLock)
+        {
+            cache = new CachedIgnoreFile(lastWriteTimeUtc, length, parsedRuleSet);
+        }
+
+        ruleSet = parsedRuleSet;
+        return true;
+    }
+
+    private static bool TryGetIgnoreFileMetadata(string path, out DateTime lastWriteTimeUtc, out long length)
+    {
+        if (!File.Exists(path) || IsSymlink(path))
+        {
+            lastWriteTimeUtc = default;
+            length = default;
+            return false;
+        }
+
+        var fileInfo = new FileInfo(path);
+        lastWriteTimeUtc = fileInfo.LastWriteTimeUtc;
+        length = fileInfo.Length;
         return true;
     }
 
@@ -126,4 +208,6 @@ public sealed class RepositoryContext
         var attributes = File.GetAttributes(path);
         return (attributes & FileAttributes.ReparsePoint) != 0;
     }
+
+    private readonly record struct CachedIgnoreFile(DateTime LastWriteTimeUtc, long Length, IgnoreRuleSet RuleSet);
 }

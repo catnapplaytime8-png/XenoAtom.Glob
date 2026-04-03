@@ -183,6 +183,38 @@ public class FileTreeWalkerTests
     }
 
     [TestMethod]
+    public void Enumerate_ShouldInvalidateCachedIgnoreFilesWhenGitIgnoreChanges()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText(".gitignore", "*.tmp\n");
+        tempDirectory.WriteAllText("file.tmp", string.Empty);
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+
+        var firstPass = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { ".gitignore" }, firstPass);
+
+        tempDirectory.WriteAllText(".gitignore", "*.log\n");
+        var gitIgnorePath = tempDirectory.GetPath(".gitignore");
+        File.SetLastWriteTimeUtc(gitIgnorePath, File.GetLastWriteTimeUtc(gitIgnorePath).AddSeconds(2));
+
+        var secondPass = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { ".gitignore", "file.tmp" }, secondPass);
+    }
+
+    [TestMethod]
     public void Enumerate_ShouldHonorCancellation()
     {
         using var tempDirectory = new TemporaryDirectory();

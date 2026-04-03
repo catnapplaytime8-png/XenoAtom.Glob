@@ -429,6 +429,8 @@ The implementation should:
 - Cache parsed ignore files by full path and last-write metadata when such caching is enabled.
 - Reuse traversal stack frames where practical.
 
+When a `RepositoryContext` is reused across traversals, the implementation should reuse parsed ignore files while their observed file metadata is unchanged, and it must invalidate those cached parses when the underlying ignore file changes.
+
 ### 13.2 Hot path constraints
 
 The hot path must avoid:

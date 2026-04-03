@@ -36,17 +36,17 @@ Traversal pruning results:
 
 | Corpus size | Mean | Allocated |
 | --- | ---: | ---: |
-| `Small` | `964.59 us` | `61.59 KB` |
-| `Medium` | `3,261.7 us` | `185.09 KB` |
-| `Large` | `7,518.8 us` | `433.53 KB` |
+| `Small` | `828.86 us` | `41.40 KB` |
+| `Medium` | `3,016.7 us` | `164.90 KB` |
+| `Large` | `7,568.8 us` | `413.34 KB` |
 
 Traversal skipped-root results:
 
 | Corpus size | Mean | Allocated |
 | --- | ---: | ---: |
-| `Small` | `299.32 us` | `24.25 KB` |
-| `Medium` | `340.39 us` | `36.13 KB` |
-| `Large` | `412.71 us` | `59.56 KB` |
+| `Small` | `102.49 us` | `5.20 KB` |
+| `Medium` | `129.31 us` | `17.08 KB` |
+| `Large` | `209.38 us` | `40.52 KB` |
 
 Artifacts:
 
@@ -58,7 +58,8 @@ Notes:
 - The traversal benchmark now exercises size-scaled corpora, while the ignore benchmark records rule-count scaling across `1`, `10`, `100`, and `1000` effective rules.
 - The latest tuning removed hot-path segment splitting, prefix string construction, and unnecessary normalization copies for already-canonical relative paths.
 - The latest traversal tuning removed needless child rule-stack cloning when a directory has no local `.gitignore`, keeps relative ignore checks on a temporary span buffer before allocating emitted paths, and avoids materializing `FileName` strings for ignored entries.
+- Repository contexts now cache parsed ignore files by path plus file metadata, which materially reduces repeated traversal costs and allows cache invalidation when `.gitignore`, `.git/info/exclude`, or global exclude files change.
 - Relative to the first short-run snapshot, `GlobBenchmarks.EvaluateIgnoreDecision` improved from `131.87 ns` / `472 B` to `61.14 ns` / `104 B`.
 - A profiler-backed traversal trace over a dedicated harness showed the dominant remaining work in `FileTreeWalker` enumeration, directory `.gitignore` existence checks (`File.Exists`, `RepositoryContext.TryLoadDirectoryRuleSet`, `RepositoryContext.CreateChildRuleSets`), and underlying handle open/close calls rather than in per-entry ignore evaluation alone.
-- The skipped-entry benchmark improved materially, but it still allocates tens of kilobytes per whole traversal operation; the stricter skipped-entry allocation gate remains intentionally open.
+- The skipped-entry benchmark improved materially again, but it still allocates non-trivial managed memory per traversal; the stricter skipped-entry allocation gate remains intentionally open.
 - Release-quality benchmarking should use longer BenchmarkDotNet jobs and be repeated on each supported platform before publishing a stable package.

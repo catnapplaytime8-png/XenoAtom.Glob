@@ -212,6 +212,7 @@ Exit criteria:
 - [x] Establish representative benchmark corpora: small, medium, large, deep, wildcard-heavy, and ignore-heavy.
 - [x] Measure allocations and throughput for path normalization, pattern compilation, matching, ignore evaluation, and traversal.
 - [x] Identify high-allocation hot spots with profiler-backed inspection.
+- [x] Cache parsed ignore files by path plus file metadata when repository contexts are reused.
 - [x] Introduce pooling or data-structure changes only when measurement justifies them.
 - [x] Verify optimizations do not change semantics by running the full correctness suite after each tuning step.
 - [x] Document expected performance characteristics and known tradeoffs.
