@@ -69,4 +69,13 @@ public class RepositoryDiscoveryTests
         Assert.AreEqual(Path.GetFullPath(topLevel), context.WorkingTreeRoot);
         Assert.AreEqual(Path.GetFullPath(resolvedGitDir), context.GitDirectory);
     }
+
+    [TestMethod]
+    public void Discover_ShouldThrowForMalformedGitFile()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        File.WriteAllText(tempDirectory.GetPath(".git"), "not-a-gitdir\n");
+
+        Assert.Throws<InvalidOperationException>(() => RepositoryDiscovery.Discover(tempDirectory.Path));
+    }
 }

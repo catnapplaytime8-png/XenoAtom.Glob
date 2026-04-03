@@ -3,6 +3,7 @@
 // See license.txt file in the project root for full license information.
 
 using XenoAtom.Glob.Ignore;
+using XenoAtom.Glob.Tests.TestInfrastructure;
 
 namespace XenoAtom.Glob.Tests.Ignore;
 
@@ -105,5 +106,31 @@ public class IgnoreMatcherTests
         Assert.IsTrue(result.IsMatch);
         Assert.IsFalse(result.IsIgnored);
         Assert.AreEqual("!app.log", result.Rule!.RawPatternText);
+    }
+
+    [TestMethod]
+    public void ParseGitIgnore_ShouldPreserveEscapedTrailingSpaces()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("space\\ \n"));
+
+        var result = matcher.Evaluate("space ");
+
+        Assert.IsTrue(result.IsIgnored);
+    }
+
+    [TestMethod]
+    public void ParseGitIgnore_ShouldSupportStreamAndReaderOverloads()
+    {
+        using var stream = new MemoryStream("*.tmp\n"u8.ToArray());
+        using var reader = new StringReader("!keep.tmp\n");
+        var low = IgnoreRuleSet.ParseGitIgnore(stream);
+        var high = IgnoreRuleSet.ParseGitIgnore(reader);
+        var matcher = new IgnoreMatcher(low, high);
+
+        var ignored = matcher.Evaluate("file.tmp");
+        var included = matcher.Evaluate("keep.tmp");
+
+        Assert.IsTrue(ignored.IsIgnored);
+        Assert.IsFalse(included.IsIgnored);
     }
 }

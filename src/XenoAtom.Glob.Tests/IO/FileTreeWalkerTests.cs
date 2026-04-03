@@ -102,6 +102,25 @@ public class FileTreeWalkerTests
         CollectionAssert.AreEqual(expected, actual);
     }
 
+    [TestMethod]
+    public void Enumerate_ShouldHonorCancellation()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.WriteAllText("a.txt", string.Empty);
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        var walker = new FileTreeWalker();
+        Assert.Throws<OperationCanceledException>(() =>
+        {
+            _ = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions
+            {
+                CancellationToken = cancellationTokenSource.Token,
+            }).ToArray();
+        });
+    }
+
     private static string[] QueryVisiblePathsFromGit(GitCli git, IReadOnlyList<string> paths)
     {
         var input = string.Join('\0', paths) + '\0';

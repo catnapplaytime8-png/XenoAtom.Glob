@@ -101,6 +101,59 @@ public class GitIgnoreDifferentialTests
         Assert.AreEqual("*.cache", localResult.Rule!.PatternText);
     }
 
+    [TestMethod]
+    public void GitDifferential_ShouldMatchCrLfAndEscapedSpaceBehavior()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        File.WriteAllText(
+            tempDirectory.GetPath(".gitignore"),
+            "space\\ \r\nname.txt\r\n!keep.txt\r\n",
+            new System.Text.UTF8Encoding(false));
+
+        var ruleSet = IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+            sourcePath: ".gitignore");
+        var matcher = new IgnoreMatcher(ruleSet);
+        var paths = new[] { "space ", "name.txt", "keep.txt" };
+        var gitResults = QueryGit(git, paths);
+
+        foreach (var path in paths)
+        {
+            var localResult = matcher.Evaluate(path);
+            var gitResult = gitResults[path];
+            Assert.AreEqual(gitResult.IsIgnored, localResult.IsIgnored, $"Mismatch for path '{path}' with Git version '{GitCli.Version}'.");
+        }
+    }
+
+    [TestMethod]
+    public void GitDifferential_ShouldMatchEscapedBangAndRecursiveWildcardBehavior()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText(".gitignore", """
+            \!literal.txt
+            a/**/b.txt
+            """);
+
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+            sourcePath: ".gitignore"));
+        var paths = new[] { "!literal.txt", "a/b.txt", "a/x/y/b.txt", "a/x/y/c.txt" };
+        var gitResults = QueryGit(git, paths);
+
+        foreach (var path in paths)
+        {
+            var localResult = matcher.Evaluate(path);
+            var gitResult = gitResults[path];
+            Assert.AreEqual(gitResult.IsIgnored, localResult.IsIgnored, $"Mismatch for path '{path}' with Git version '{GitCli.Version}'.");
+        }
+    }
+
     private static Dictionary<string, GitCheckIgnoreResult> QueryGit(GitCli git, IReadOnlyList<string> paths)
     {
         var input = string.Join('\0', paths) + '\0';

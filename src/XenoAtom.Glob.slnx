@@ -16,5 +16,6 @@
     <File Path="global.json" />
   </Folder>
   <Project Path="XenoAtom.Glob.Tests/XenoAtom.Glob.Tests.csproj" />
+  <Project Path="XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj" />
   <Project Path="XenoAtom.Glob/XenoAtom.Glob.csproj" />
 </Solution>

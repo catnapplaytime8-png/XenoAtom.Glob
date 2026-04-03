@@ -39,20 +39,23 @@ public sealed class FileTreeWalker
                 options.AdditionalRuleSets);
         }
 
-        var rootMatcher = new IgnoreMatcher(rootRuleSets);
-        return EnumerateCore(fullRootPath, startRelativeDirectory, rootRuleSets, rootMatcher, options, repositoryContext);
+        var rootIgnoreStack = new IgnoreStack(rootRuleSets);
+        return EnumerateCore(fullRootPath, startRelativeDirectory, rootIgnoreStack, options, repositoryContext);
     }
 
     private IEnumerable<FileTreeEntry> EnumerateCore(
         string directoryPath,
         string relativeDirectory,
-        IReadOnlyList<IgnoreRuleSet> ruleSets,
-        IgnoreMatcher matcher,
+        IgnoreStack ignoreStack,
         FileTreeWalkOptions options,
         RepositoryContext? repositoryContext)
     {
+        options.CancellationToken.ThrowIfCancellationRequested();
+
         foreach (var entry in EnumerateDirectory(directoryPath))
         {
+            options.CancellationToken.ThrowIfCancellationRequested();
+
             if (repositoryContext is not null && entry.Name == ".git")
             {
                 continue;
@@ -64,7 +67,7 @@ public sealed class FileTreeWalker
             }
 
             var relativePath = relativeDirectory.Length == 0 ? entry.Name : $"{relativeDirectory}/{entry.Name}";
-            var ignored = matcher.Evaluate(relativePath, entry.IsDirectory);
+            var ignored = ignoreStack.Matcher.Evaluate(relativePath, entry.IsDirectory);
             if (ignored.IsIgnored)
             {
                 continue;
@@ -77,12 +80,8 @@ public sealed class FileTreeWalker
                     yield return new FileTreeEntry(relativePath, entry.FullPath, true);
                 }
 
-                var childRuleSets = repositoryContext is null
-                    ? ruleSets
-                    : repositoryContext.CreateChildRuleSets(ruleSets, relativePath);
-                var childMatcher = childRuleSets == ruleSets ? matcher : new IgnoreMatcher(childRuleSets);
-
-                foreach (var childEntry in EnumerateCore(entry.FullPath, relativePath, childRuleSets, childMatcher, options, repositoryContext))
+                var childIgnoreStack = ignoreStack.PushDirectory(repositoryContext, relativePath);
+                foreach (var childEntry in EnumerateCore(entry.FullPath, relativePath, childIgnoreStack, options, repositoryContext))
                 {
                     yield return childEntry;
                 }

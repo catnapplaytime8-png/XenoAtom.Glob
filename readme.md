@@ -6,7 +6,41 @@ A gitignore compatible glob library.
 
 ## ✨ Features
 
-- TODO
+- Compiled glob patterns with `*`, `?`, character classes, escapes, and `**`
+- Git-compatible ignore parsing and layered evaluation
+- Repository discovery for `.git` directories and gitfiles
+- Tree walking with ignore-aware directory pruning
+- Differential tests against the Git CLI for compatibility-sensitive behavior
+
+## 🚀 Quick Example
+
+```csharp
+using XenoAtom.Glob;
+using XenoAtom.Glob.Git;
+using XenoAtom.Glob.IO;
+using XenoAtom.Glob.Ignore;
+
+var pattern = GlobPattern.Parse("src/**/file.cs");
+var matches = pattern.IsMatch("src/nested/file.cs");
+
+var ruleSet = IgnoreRuleSet.ParseGitIgnore("""
+    *.tmp
+    build/
+    !build/keep.tmp
+    """);
+var ignoreMatcher = new IgnoreMatcher(ruleSet);
+var ignored = ignoreMatcher.Evaluate("build/output.tmp").IsIgnored;
+
+var repository = RepositoryDiscovery.Discover(@"C:\code\my-repo");
+var walker = new FileTreeWalker();
+foreach (var entry in walker.Enumerate(repository.WorkingTreeRoot, new FileTreeWalkOptions
+{
+    RepositoryContext = repository,
+}))
+{
+    Console.WriteLine(entry.RelativePath);
+}
+```
 
 ## 📖 User Guide
 

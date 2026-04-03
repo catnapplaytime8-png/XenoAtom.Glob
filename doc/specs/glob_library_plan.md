@@ -9,9 +9,9 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 - [ ] Treat [glob_library_specs.md](./glob_library_specs.md) as the behavioral contract.
 - [ ] Keep diffs focused and land work in self-contained steps.
 - [ ] Add tests before or with each behavior change.
-- [ ] Keep `readme.md`, `doc/readme.md`, and the spec docs in sync with shipped behavior.
+- [x] Keep `readme.md`, `doc/readme.md`, and the spec docs in sync with shipped behavior.
 - [ ] Do not defer correctness gaps behind undocumented TODO behavior.
-- [ ] Run the full test suite before closing each milestone.
+- [x] Run the full test suite before closing each milestone.
 
 ## 2. Milestone Overview
 
@@ -29,10 +29,10 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 ## 3. Milestone 0: Development Foundation And Quality Harness
 
 - [x] Create the initial public API sketch in code comments or stub types so the implementation has a stable target.
-- [ ] Establish namespace layout under `XenoAtom.Glob`, `XenoAtom.Glob.Ignore`, `XenoAtom.Glob.IO`, and `XenoAtom.Glob.Git`.
+- [x] Establish namespace layout under `XenoAtom.Glob`, `XenoAtom.Glob.Ignore`, `XenoAtom.Glob.IO`, and `XenoAtom.Glob.Git`.
 - [x] Replace placeholder files in the library and tests with meaningful structure.
 - [x] Set up test helper infrastructure for temporary directories, temporary repositories, and path corpus generation.
-- [ ] Add a benchmark project or benchmark folder strategy for later BenchmarkDotNet coverage.
+- [x] Add a benchmark project or benchmark folder strategy for later BenchmarkDotNet coverage.
 - [x] Add shared test utilities for path normalization, file layout creation, and Git CLI invocation.
 - [ ] Add CI expectations for unit tests, Git differential tests, and benchmarks that are safe to run in CI.
 - [ ] Require Git to be present in CI on supported platforms and fail fast with a clear message when the differential suite cannot run in environments where it is expected.
@@ -87,7 +87,7 @@ Tests:
 
 Exit criteria:
 
-- [ ] The glob engine is usable without any ignore-file infrastructure.
+- [x] The glob engine is usable without any ignore-file infrastructure.
 - [ ] Specialized and fallback matchers produce identical results for the same semantic input.
 
 ## 6. Milestone 3: `.gitignore` Parser And Rule Compilation
@@ -97,7 +97,7 @@ Exit criteria:
 - [x] Support LF and CRLF inputs and files without a trailing newline.
 - [x] Compile parsed ignore rules into immutable rule objects using the core glob engine.
 - [x] Capture anchoring mode and directory-only behavior explicitly rather than inferring them at match time.
-- [ ] Provide a parser API that can read from text, spans, or streams without forcing the caller into one input model.
+- [x] Provide a parser API that can read from text, spans, or streams without forcing the caller into one input model.
 
 Tests:
 
@@ -119,7 +119,7 @@ Exit criteria:
 - [x] Implement per-directory relative evaluation semantics.
 - [x] Implement negation behavior and the no-reinclude-below-pruned-directory rule.
 - [x] Add `IgnoreEvaluationResult` with a minimal fast-path shape and optional expanded diagnostics.
-- [ ] Design `IgnoreStack` push/pop mechanics so descending into directories does not rebuild all parent state.
+- [x] Design `IgnoreStack` push/pop mechanics so descending into directories does not rebuild all parent state.
 
 Tests:
 
@@ -139,7 +139,7 @@ Differential tests:
 - [x] Compare both the ignore decision and the winning rule metadata against Git.
 - [x] Include cases for `.gitignore`, `.git/info/exclude`, and `core.excludesFile`.
 - [x] Include cases with nested `.gitignore` files and conflicting rules.
-- [ ] Include cases with CRLF rule files, escaped spaces, escaped leading `!`, and complex `**` patterns.
+- [x] Include cases with CRLF rule files, escaped spaces, escaped leading `!`, and complex `**` patterns.
 - [ ] Include cases that intentionally probe documented Git limitations such as failed re-inclusion below excluded directories.
 - [ ] Store fixture definitions in a reusable corpus format so regressions can be reproduced exactly.
 
@@ -163,7 +163,7 @@ Tests:
 - [x] Unit tests for repository discovery when `.git` is a gitfile with a relative path.
 - [x] Unit tests for worktree-like metadata layouts.
 - [ ] Unit tests for submodule-like gitfile layouts.
-- [ ] Unit tests for missing or malformed gitfile content.
+- [x] Unit tests for missing or malformed gitfile content.
 - [x] Differential tests proving the discovered root, git dir, and ignore sources match what Git reports for the same temporary repository.
 - [x] Validate repository discovery against `git rev-parse --show-toplevel` and `git rev-parse --git-dir`.
 
@@ -179,8 +179,8 @@ Exit criteria:
 - [x] Load per-directory `.gitignore` lazily when entering a directory.
 - [x] Implement pruning of excluded directories.
 - [x] Keep non-following symlink or reparse-point behavior as the default Git-compatible mode.
-- [ ] Add cancellation support to long-running walks.
-- [ ] Decide and document whether ordering is unspecified or optionally configurable.
+- [x] Add cancellation support to long-running walks.
+- [x] Decide and document whether ordering is unspecified or optionally configurable.
 
 Tests:
 
@@ -239,21 +239,21 @@ Exit criteria:
 
 ## 12. Milestone 9: API Review, Documentation, And Release Readiness
 
-- [ ] Review public API naming, overload shape, XML docs, and discoverability.
-- [ ] Remove placeholder or experimental types that should not ship.
-- [ ] Add XML docs for all public APIs, including exceptions and behavioral caveats.
-- [ ] Update `readme.md` with the final capability set and usage examples.
-- [ ] Update `doc/readme.md` with a more detailed guide for globbing, ignore evaluation, and traversal.
+- [x] Review public API naming, overload shape, XML docs, and discoverability.
+- [x] Remove placeholder or experimental types that should not ship.
+- [x] Add XML docs for all public APIs, including exceptions and behavioral caveats.
+- [x] Update `readme.md` with the final capability set and usage examples.
+- [x] Update `doc/readme.md` with a more detailed guide for globbing, ignore evaluation, and traversal.
 - [ ] Cross-check this plan and the spec against the actual implementation and mark deferred items explicitly.
-- [ ] Add examples for standalone glob use, standalone ignore use, and repository traversal use.
-- [ ] Review AOT and trimming compatibility warnings and resolve or document them.
+- [x] Add examples for standalone glob use, standalone ignore use, and repository traversal use.
+- [x] Review AOT and trimming compatibility warnings and resolve or document them.
 
 Release gate:
 
 - [ ] All tests pass locally and in CI.
 - [ ] Differential compatibility suite is green.
 - [ ] Benchmark results are recorded for the release candidate.
-- [ ] Docs match the shipped API and behavior.
+- [x] Docs match the shipped API and behavior.
 
 ## 13. Top-Confidence Test Plan
 

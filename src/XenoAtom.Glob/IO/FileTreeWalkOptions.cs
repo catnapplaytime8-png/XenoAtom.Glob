@@ -24,13 +24,18 @@ public sealed class FileTreeWalkOptions
     public bool FollowSymbolicLinks { get; set; }
 
     /// <summary>
+    /// Gets or sets the cancellation token used during traversal.
+    /// </summary>
+    public CancellationToken CancellationToken { get; set; }
+
+    /// <summary>
     /// Gets or sets the repository context used for Git-aware ignore resolution.
     /// </summary>
     public RepositoryContext? RepositoryContext { get; set; }
 
     /// <summary>
     /// Gets or sets additional ignore rule sets that participate in traversal.
-    /// Later rule sets have higher precedence.
+    /// Later rule sets have higher precedence. Entry ordering is otherwise unspecified.
     /// </summary>
     public IReadOnlyList<IgnoreRuleSet>? AdditionalRuleSets { get; set; }
 }
