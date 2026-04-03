@@ -114,10 +114,12 @@ public sealed class IgnoreMatcher
         IgnoreRule? winningRule = null;
         var ignored = false;
 
-        foreach (var ruleSet in _ruleSets)
+        for (var ruleSetIndex = 0; ruleSetIndex < _ruleSets.Count; ruleSetIndex++)
         {
-            foreach (var rule in ruleSet.Rules)
+            var rules = _ruleSets[ruleSetIndex].Rules;
+            for (var ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
             {
+                var rule = rules[ruleIndex];
                 if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, candidateLength, isDirectory, _comparison))
                 {
                     continue;
@@ -139,10 +141,12 @@ public sealed class IgnoreMatcher
         IgnoreRule? winningRule = null;
         var ignored = false;
 
-        foreach (var ruleSet in _ruleSets)
+        for (var ruleSetIndex = 0; ruleSetIndex < _ruleSets.Count; ruleSetIndex++)
         {
-            foreach (var rule in ruleSet.Rules)
+            var rules = _ruleSets[ruleSetIndex].Rules;
+            for (var ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
             {
+                var rule = rules[ruleIndex];
                 if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, _comparison))
                 {
                     continue;

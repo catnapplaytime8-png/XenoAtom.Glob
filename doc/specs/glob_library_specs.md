@@ -607,6 +607,7 @@ Benchmark separately:
 - Ignore evaluation with shallow and deep rule stacks
 - Tree traversal on small, medium, and large directory corpora
 - Traversal scenarios where ignored root entries are skipped before path materialization
+- A raw runtime one-level enumeration baseline so skipped-entry overhead can be compared against the underlying `FileSystemEnumerator<T>` floor
 - Worst-case wildcard-heavy rule sets
 
 Use BenchmarkDotNet and keep representative real-world corpora in a reproducible test asset strategy.

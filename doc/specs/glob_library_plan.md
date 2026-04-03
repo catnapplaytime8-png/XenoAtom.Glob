@@ -22,7 +22,7 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 - [x] Milestone 4: Ignore evaluation engine and explanation model
 - [x] Milestone 5: Git-aware repository discovery
 - [x] Milestone 6: File tree walker and traversal pruning
-- [ ] Milestone 7: Performance tuning and benchmark hardening
+- [x] Milestone 7: Performance tuning and benchmark hardening
 - [x] Milestone 8: Additional ignore dialect hooks
 - [ ] Milestone 9: API review, documentation, and release readiness
 
@@ -220,12 +220,12 @@ Exit criteria:
 Benchmark gates:
 
 - [x] Benchmark results are reproducible enough to detect regressions.
-- [ ] Allocation counts for skipped entries remain near-zero in the intended steady state.
+- [x] Allocation counts for skipped entries remain near-zero in the intended steady state.
 - [x] No optimization lands without a before-and-after measurement.
 
 Notes:
 
-- [ ] The dedicated skipped-entry traversal benchmark remains an explicit open gate until ignored entries can be skipped with genuinely negligible managed allocations in steady-state runs.
+- [x] The dedicated skipped-entry traversal benchmark confirms that ignored entries are skipped with genuinely negligible managed allocations in steady-state runs.
 
 ## 11. Milestone 8: Additional Ignore Dialect Hooks
 

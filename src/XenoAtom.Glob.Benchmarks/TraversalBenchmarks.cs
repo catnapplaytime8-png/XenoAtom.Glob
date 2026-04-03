@@ -1,3 +1,5 @@
+using System.IO.Enumeration;
+
 using BenchmarkDotNet.Attributes;
 
 using XenoAtom.Glob.IO;
@@ -118,6 +120,9 @@ public class TraversalBenchmarks
     [Benchmark]
     public int EnumerateWhereAllRootEntriesAreSkipped() => _walker.Enumerate(_skippedFixture.RootPath, _skippedOptions).Count();
 
+    [Benchmark]
+    public int EnumerateRootEntriesWithRawRuntimeEnumerator() => CountRootEntriesRaw(_skippedFixture.RootPath);
+
     [GlobalCleanup]
     public void Cleanup()
     {
@@ -125,5 +130,36 @@ public class TraversalBenchmarks
         _deepIgnoreFixture.Dispose();
         _prunedFixture.Dispose();
         _skippedFixture.Dispose();
+    }
+
+    private static int CountRootEntriesRaw(string directoryPath)
+    {
+        using var enumerator = new RawCountingEnumerator(directoryPath);
+        var count = 0;
+        while (enumerator.MoveNext())
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    private sealed class RawCountingEnumerator : FileSystemEnumerator<int>
+    {
+        private static readonly EnumerationOptions Options = new()
+        {
+            AttributesToSkip = 0,
+            IgnoreInaccessible = false,
+            RecurseSubdirectories = false,
+        };
+
+        public RawCountingEnumerator(string directoryPath)
+            : base(directoryPath, Options)
+        {
+        }
+
+        protected override bool ShouldIncludeEntry(ref FileSystemEntry entry) => true;
+
+        protected override int TransformEntry(ref FileSystemEntry entry) => 0;
     }
 }
