@@ -78,4 +78,19 @@ public class RepositoryDiscoveryTests
 
         Assert.Throws<InvalidOperationException>(() => RepositoryDiscovery.Discover(tempDirectory.Path));
     }
+
+    [TestMethod]
+    public void Discover_ShouldResolveSubmoduleStyleGitFile()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.CreateDirectory(".git", "modules", "submodule", "info");
+        File.WriteAllText(tempDirectory.GetPath(".git", "modules", "submodule", "config"), "[core]\n\trepositoryformatversion = 0\n");
+        tempDirectory.CreateDirectory("submodule");
+        File.WriteAllText(tempDirectory.GetPath("submodule", ".git"), "gitdir: ../.git/modules/submodule\n");
+
+        var context = RepositoryDiscovery.Discover(tempDirectory.GetPath("submodule"));
+
+        Assert.AreEqual(Path.GetFullPath(tempDirectory.GetPath("submodule")), context.WorkingTreeRoot);
+        Assert.AreEqual(Path.GetFullPath(tempDirectory.GetPath(".git", "modules", "submodule")), context.GitDirectory);
+    }
 }

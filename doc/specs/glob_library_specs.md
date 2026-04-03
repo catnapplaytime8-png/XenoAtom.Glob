@@ -163,6 +163,7 @@ Proposed primary types:
 
 - `GlobPattern`
 - `GlobMatcher`
+- `IgnoreDialect`
 - `IgnoreRule`
 - `IgnoreRuleSet`
 - `IgnoreMatcher`
@@ -210,6 +211,8 @@ Boundary normalization must:
 - Avoid resolving symlinks during normal matching.
 
 Git-aware mode must keep case-sensitivity as an explicit compatibility concern. The exact default comparison policy must be locked down by differential tests on each supported platform instead of being guessed from API preference alone.
+
+The implementation may use separate comparison defaults for standalone glob matching and Git-compatible ignore evaluation, as long as the behavior is explicit and covered by differential tests.
 
 ### 8.3 Relative path discipline
 
@@ -501,6 +504,8 @@ The design should leave room for:
 - `.dockerignore`
 
 Support for these dialects should come through explicit dialect adapters, not by weakening `.gitignore` correctness.
+
+The first follow-up dialect may intentionally be `.ignore`, provided it is exposed as an explicit dialect selection and documented independently from `.gitignore`.
 
 ## 16. Diagnostics and Introspection
 

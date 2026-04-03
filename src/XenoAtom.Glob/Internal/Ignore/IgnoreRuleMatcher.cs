@@ -8,43 +8,63 @@ namespace XenoAtom.Glob.Internal;
 
 internal static class IgnoreRuleMatcher
 {
-    public static bool IsMatch(IgnoreRule rule, string candidatePath, bool isDirectory)
+    public static bool IsMatch(IgnoreRule rule, string candidatePath, int candidateLength, bool isDirectory, PathStringComparison comparison)
     {
-        if (!TryGetRelativePath(rule.BaseDirectory, candidatePath, out var relativePath))
+        if (!TryGetRelativePathRange(rule.BaseDirectory, candidatePath, candidateLength, comparison, out var relativeStart, out var relativeLength))
         {
             return false;
         }
 
-        var segments = relativePath.Length == 0 ? [] : relativePath.Split('/');
+        if (relativeLength == 0)
+        {
+            return false;
+        }
+
+        var relativePath = candidatePath.AsSpan(relativeStart, relativeLength);
         if (rule.BasenameOnly)
         {
-            for (var index = 0; index < segments.Length; index++)
+            var segmentStart = 0;
+            for (var index = 0; index <= relativePath.Length; index++)
             {
-                var segmentIsDirectory = index < segments.Length - 1 || isDirectory;
-                if (rule.DirectoryOnly && !segmentIsDirectory)
+                if (index < relativePath.Length && relativePath[index] != '/')
                 {
                     continue;
                 }
 
-                if (rule.CompiledPattern.Match(new NormalizedPath(segments[index], segmentIsDirectory)))
+                var segmentIsDirectory = index < relativePath.Length || isDirectory;
+                if (rule.DirectoryOnly && !segmentIsDirectory)
+                {
+                    segmentStart = index + 1;
+                    continue;
+                }
+
+                if (rule.CompiledPattern.Match(relativePath.Slice(segmentStart, index - segmentStart), segmentIsDirectory, segmentCount: 1, comparison))
                 {
                     return true;
                 }
+
+                segmentStart = index + 1;
             }
 
             return false;
         }
 
-        for (var depth = 0; depth < segments.Length; depth++)
+        var matchedSegmentCount = 0;
+        for (var index = 0; index <= relativePath.Length; index++)
         {
-            var prefixPath = string.Join('/', segments.Take(depth + 1));
-            var prefixIsDirectory = depth < segments.Length - 1 || isDirectory;
+            if (index < relativePath.Length && relativePath[index] != '/')
+            {
+                continue;
+            }
+
+            matchedSegmentCount++;
+            var prefixIsDirectory = index < relativePath.Length || isDirectory;
             if (rule.DirectoryOnly && !prefixIsDirectory)
             {
                 continue;
             }
 
-            if (rule.CompiledPattern.Match(new NormalizedPath(prefixPath, prefixIsDirectory)))
+            if (rule.CompiledPattern.Match(relativePath[..index], prefixIsDirectory, matchedSegmentCount, comparison))
             {
                 return true;
             }
@@ -53,30 +73,34 @@ internal static class IgnoreRuleMatcher
         return false;
     }
 
-    private static bool TryGetRelativePath(string baseDirectory, string candidatePath, out string relativePath)
+    private static bool TryGetRelativePathRange(string baseDirectory, string candidatePath, int candidateLength, PathStringComparison comparison, out int relativeStart, out int relativeLength)
     {
         if (baseDirectory.Length == 0)
         {
-            relativePath = candidatePath;
+            relativeStart = 0;
+            relativeLength = candidateLength;
             return true;
         }
 
-        if (candidatePath.Length == baseDirectory.Length &&
-            string.Equals(candidatePath, baseDirectory, StringComparison.Ordinal))
+        if (candidateLength == baseDirectory.Length &&
+            comparison.Equals(candidatePath.AsSpan(0, candidateLength), baseDirectory))
         {
-            relativePath = string.Empty;
+            relativeStart = 0;
+            relativeLength = 0;
             return true;
         }
 
-        if (candidatePath.Length > baseDirectory.Length &&
-            candidatePath.StartsWith(baseDirectory, StringComparison.Ordinal) &&
+        if (candidateLength > baseDirectory.Length &&
+            comparison.StartsWith(candidatePath.AsSpan(0, candidateLength), baseDirectory) &&
             candidatePath[baseDirectory.Length] == '/')
         {
-            relativePath = candidatePath[(baseDirectory.Length + 1)..];
+            relativeStart = baseDirectory.Length + 1;
+            relativeLength = candidateLength - relativeStart;
             return true;
         }
 
-        relativePath = string.Empty;
+        relativeStart = 0;
+        relativeLength = 0;
         return false;
     }
 }

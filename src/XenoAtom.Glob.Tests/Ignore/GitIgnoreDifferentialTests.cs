@@ -61,19 +61,8 @@ public class GitIgnoreDifferentialTests
         var gitResults = QueryGit(git, paths);
         foreach (var path in paths)
         {
-            var localResult = matcher.Evaluate(path);
             var gitResult = gitResults[path];
-
-            Assert.AreEqual(
-                gitResult.IsIgnored,
-                localResult.IsIgnored,
-                $"Mismatch for path '{path}' with Git version '{GitCli.Version}'.");
-
-            if (gitResult.IsIgnored)
-            {
-                Assert.IsNotNull(localResult.Rule, $"Expected a winning rule for '{path}'.");
-                Assert.AreEqual(gitResult.Pattern, localResult.Rule!.RawPatternText);
-            }
+            GitCompatibilityAssert.Matches(path, false, git, gitResult, matcher, "nested-gitignore");
         }
     }
 
@@ -122,9 +111,8 @@ public class GitIgnoreDifferentialTests
 
         foreach (var path in paths)
         {
-            var localResult = matcher.Evaluate(path);
             var gitResult = gitResults[path];
-            Assert.AreEqual(gitResult.IsIgnored, localResult.IsIgnored, $"Mismatch for path '{path}' with Git version '{GitCli.Version}'.");
+            GitCompatibilityAssert.Matches(path, false, git, gitResult, matcher, "crlf-and-escaped-space");
         }
     }
 
@@ -148,9 +136,104 @@ public class GitIgnoreDifferentialTests
 
         foreach (var path in paths)
         {
-            var localResult = matcher.Evaluate(path);
             var gitResult = gitResults[path];
-            Assert.AreEqual(gitResult.IsIgnored, localResult.IsIgnored, $"Mismatch for path '{path}' with Git version '{GitCli.Version}'.");
+            GitCompatibilityAssert.Matches(path, false, git, gitResult, matcher, "escaped-bang-and-recursive");
+        }
+    }
+
+    [TestMethod]
+    public void GitDifferential_ShouldMatchCorpusFixtures()
+    {
+        foreach (var fixture in GitIgnoreCorpus.Load())
+        {
+            using var tempDirectory = new TemporaryDirectory();
+            var git = GitCli.In(tempDirectory.Path);
+            git.RunChecked("init", "--quiet");
+
+            foreach (var file in fixture.Files)
+            {
+                tempDirectory.WriteAllText(file.Key, file.Value);
+            }
+
+            var matcher = BuildMatcherFromRepository(tempDirectory);
+            var gitResults = QueryGit(git, fixture.Paths);
+            foreach (var path in fixture.Paths)
+            {
+                GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, fixture.Name);
+            }
+        }
+    }
+
+    [TestMethod]
+    public void GitDifferential_ShouldMatchCaseSensitivityOnCurrentPlatform()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        tempDirectory.WriteAllText(".gitignore", "*.TXT\n");
+
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+            sourcePath: ".gitignore"));
+
+        var paths = new[] { "file.txt", "file.TXT" };
+        var gitResults = QueryGit(git, paths);
+        foreach (var path in paths)
+        {
+            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, "case-sensitivity");
+        }
+    }
+
+    [TestMethod]
+    public void GitDifferential_ShouldMatchGeneratedRuleOrderingAndNegationScenarios()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        var random = new Random(97);
+        string[] rules =
+        [
+            "*.tmp",
+            "*.log",
+            "build/",
+            "cache/",
+            "!keep.tmp",
+            "!important.log",
+            "src/generated/",
+            "!src/generated/include.txt",
+            "docs/**/*.bak",
+            "!docs/reference/keep.bak",
+        ];
+        string[] paths =
+        [
+            "file.tmp",
+            "keep.tmp",
+            "trace.log",
+            "important.log",
+            "build/output.bin",
+            "cache/entry.dat",
+            "src/generated/code.cs",
+            "src/generated/include.txt",
+            "docs/reference/a.bak",
+            "docs/reference/keep.bak",
+            "src/app/main.cs",
+        ];
+
+        for (var iteration = 0; iteration < 50; iteration++)
+        {
+            var selectedRules = SelectRules(random, rules);
+            tempDirectory.WriteAllText(".gitignore", string.Join('\n', selectedRules) + "\n");
+
+            var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+                sourcePath: ".gitignore"));
+
+            var gitResults = QueryGit(git, paths);
+            foreach (var path in paths)
+            {
+                GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, $"generated-ordering-{iteration}");
+            }
         }
     }
 
@@ -180,5 +263,54 @@ public class GitIgnoreDifferentialTests
         return map;
     }
 
-    private readonly record struct GitCheckIgnoreResult(bool IsIgnored, string? Source, string? LineNumber, string? Pattern);
+    private static string[] SelectRules(Random random, string[] rules)
+    {
+        var count = random.Next(1, rules.Length + 1);
+        var selected = rules
+            .OrderBy(_ => random.Next())
+            .Take(count)
+            .ToArray();
+        return selected;
+    }
+
+    private static IgnoreMatcher BuildMatcherFromRepository(TemporaryDirectory tempDirectory)
+    {
+        var ruleSets = new List<IgnoreRuleSet>();
+        var globalExclude = tempDirectory.GetPath("global-ignore.txt");
+        if (File.Exists(globalExclude))
+        {
+            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(globalExclude),
+                sourcePath: globalExclude,
+                sourceKind: IgnoreRuleSourceKind.GlobalExclude));
+        }
+
+        var infoExclude = tempDirectory.GetPath(".git", "info", "exclude");
+        if (File.Exists(infoExclude))
+        {
+            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(infoExclude),
+                sourcePath: infoExclude,
+                sourceKind: IgnoreRuleSourceKind.RepositoryExclude));
+        }
+
+        foreach (var gitIgnorePath in Directory.GetFiles(tempDirectory.Path, ".gitignore", SearchOption.AllDirectories)
+                     .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
+        {
+            var baseDirectory = Path.GetDirectoryName(gitIgnorePath)!;
+            var relativeBase = Path.GetRelativePath(tempDirectory.Path, baseDirectory).Replace('\\', '/');
+            if (relativeBase == ".")
+            {
+                relativeBase = string.Empty;
+            }
+
+            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(gitIgnorePath),
+                baseDirectory: relativeBase,
+                sourcePath: gitIgnorePath,
+                sourceKind: IgnoreRuleSourceKind.PerDirectory));
+        }
+
+        return new IgnoreMatcher(ruleSets);
+    }
 }

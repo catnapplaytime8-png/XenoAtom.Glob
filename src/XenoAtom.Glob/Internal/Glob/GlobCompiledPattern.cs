@@ -38,32 +38,41 @@ internal sealed class GlobCompiledPattern
 
     public string? SuffixText { get; }
 
-    public bool Match(NormalizedPath path)
+    public bool Match(NormalizedPath path, PathStringComparison comparison)
+        => Match(path.Value.AsSpan(), path.IsDirectory, path.SegmentCount, comparison);
+
+    public bool Match(ReadOnlySpan<char> path, bool isDirectory, int segmentCount, PathStringComparison comparison)
     {
         return Kind switch
         {
             GlobPatternKind.Empty => path.IsEmpty,
-            GlobPatternKind.Exact => string.Equals(path.Value, ExactText, StringComparison.Ordinal),
-            GlobPatternKind.Prefix => path.SegmentCount == 1 && path.Value.StartsWith(PrefixText!, StringComparison.Ordinal),
-            GlobPatternKind.Suffix => path.SegmentCount == 1 && path.Value.EndsWith(SuffixText!, StringComparison.Ordinal),
-            GlobPatternKind.MatchAll => path.SegmentCount == 1,
+            GlobPatternKind.Exact => comparison.Equals(path, ExactText!),
+            GlobPatternKind.Prefix => segmentCount == 1 && comparison.StartsWith(path, PrefixText!),
+            GlobPatternKind.Suffix => segmentCount == 1 && comparison.EndsWith(path, SuffixText!),
+            GlobPatternKind.MatchAll => segmentCount == 1,
             GlobPatternKind.RecursiveMatchAll => true,
-            _ => MatchGeneral(path),
+            _ => MatchGeneral(path, segmentCount, comparison),
         };
     }
 
-    private bool MatchGeneral(NormalizedPath path)
+    public bool MatchGeneralOnly(NormalizedPath path, PathStringComparison comparison)
     {
-        var segmentCount = path.SegmentCount;
+        return MatchGeneral(path.Value.AsSpan(), path.SegmentCount, comparison);
+    }
+
+    public string GetDebugView() => $"{Kind}: {string.Join("/", Segments.Select(static x => x.RawText))}";
+
+    private bool MatchGeneral(ReadOnlySpan<char> path, int segmentCount, PathStringComparison comparison)
+    {
         Span<SegmentRange> segmentRanges = segmentCount <= 32
             ? stackalloc SegmentRange[segmentCount]
             : new SegmentRange[segmentCount];
 
-        FillPathSegments(path.Value, segmentRanges);
-        return MatchSegments(path.Value, segmentRanges, 0, 0);
+        FillPathSegments(path, segmentRanges);
+        return MatchSegments(path, segmentRanges, 0, 0, comparison);
     }
 
-    private bool MatchSegments(string path, ReadOnlySpan<SegmentRange> segmentRanges, int patternIndex, int segmentIndex)
+    private bool MatchSegments(ReadOnlySpan<char> path, ReadOnlySpan<SegmentRange> segmentRanges, int patternIndex, int segmentIndex, PathStringComparison comparison)
     {
         while (patternIndex < Segments.Length)
         {
@@ -82,7 +91,7 @@ internal sealed class GlobCompiledPattern
 
                 for (var candidate = segmentIndex; candidate <= segmentRanges.Length; candidate++)
                 {
-                    if (MatchSegments(path, segmentRanges, patternIndex + 1, candidate))
+                    if (MatchSegments(path, segmentRanges, patternIndex + 1, candidate, comparison))
                     {
                         return true;
                     }
@@ -97,7 +106,7 @@ internal sealed class GlobCompiledPattern
             }
 
             var range = segmentRanges[segmentIndex];
-            if (!segment.IsMatch(path.AsSpan(range.Start, range.Length)))
+            if (!segment.IsMatch(path.Slice(range.Start, range.Length), comparison))
             {
                 return false;
             }
@@ -109,7 +118,7 @@ internal sealed class GlobCompiledPattern
         return segmentIndex == segmentRanges.Length;
     }
 
-    private static void FillPathSegments(string path, Span<SegmentRange> segments)
+    private static void FillPathSegments(ReadOnlySpan<char> path, Span<SegmentRange> segments)
     {
         if (segments.Length == 0)
         {

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "failed-reinclude-below-excluded-directory",
+    "files": {
+      ".gitignore": "cache/\n!cache/include.txt\n"
+    },
+    "paths": [
+      "cache/include.txt",
+      "cache/other.txt"
+    ]
+  },
+  {
+    "name": "nested-overrides-and-info-exclude",
+    "files": {
+      ".gitignore": "*.log\ntemp/\n!keep.log\n",
+      "src/.gitignore": "generated/\n!generated/include.txt\nspecial.txt\n",
+      ".git/info/exclude": "ignored-by-info.txt\n"
+    },
+    "paths": [
+      "trace.log",
+      "keep.log",
+      "temp/data.txt",
+      "src/generated/code.cs",
+      "src/generated/include.txt",
+      "src/special.txt",
+      "ignored-by-info.txt",
+      "src/normal.txt"
+    ]
+  },
+  {
+    "name": "crlf-and-escaped-space",
+    "files": {
+      ".gitignore": "space\\ \r\nname.txt\r\n!keep.txt\r\n"
+    },
+    "paths": [
+      "space ",
+      "name.txt",
+      "keep.txt"
+    ]
+  },
+  {
+    "name": "escaped-bang-and-recursive-wildcard",
+    "files": {
+      ".gitignore": "\\!literal.txt\na/**/b.txt\n"
+    },
+    "paths": [
+      "!literal.txt",
+      "a/b.txt",
+      "a/x/y/b.txt",
+      "a/x/y/c.txt"
+    ]
+  }
+]

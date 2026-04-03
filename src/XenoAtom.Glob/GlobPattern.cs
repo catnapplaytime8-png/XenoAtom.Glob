@@ -11,6 +11,7 @@ namespace XenoAtom.Glob;
 /// </summary>
 public sealed class GlobPattern
 {
+    private static readonly PathStringComparison DefaultComparison = PathStringComparison.Ordinal;
     private readonly GlobCompiledPattern _compiledPattern;
 
     internal GlobPattern(string pattern, GlobCompiledPattern compiledPattern)
@@ -71,7 +72,7 @@ public sealed class GlobPattern
     public bool IsMatch(string path, bool isDirectory = false)
     {
         var normalizedPath = PathNormalizer.NormalizeRelativePath(path, isDirectory);
-        return _compiledPattern.Match(normalizedPath);
+        return _compiledPattern.Match(normalizedPath, DefaultComparison);
     }
 
     private static string GetErrorMessage(GlobPatternParseError error) => error switch

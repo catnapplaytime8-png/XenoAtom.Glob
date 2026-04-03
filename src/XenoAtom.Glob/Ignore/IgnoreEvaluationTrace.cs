@@ -2,7 +2,6 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
-using System.Runtime.CompilerServices;
+namespace XenoAtom.Glob.Ignore;
 
-[assembly: InternalsVisibleTo("XenoAtom.Glob.Tests")]
-[assembly: InternalsVisibleTo("XenoAtom.Glob.Benchmarks")]
+internal readonly record struct IgnoreEvaluationTrace(IgnoreEvaluationResult Result, IReadOnlyList<IgnoreRule> MatchedRules);

@@ -8,9 +8,11 @@ A gitignore compatible glob library.
 
 - Compiled glob patterns with `*`, `?`, character classes, escapes, and `**`
 - Git-compatible ignore parsing and layered evaluation
+- Explicit ignore dialect selection for `.gitignore` and `.ignore`
 - Repository discovery for `.git` directories and gitfiles
 - Tree walking with ignore-aware directory pruning
 - Differential tests against the Git CLI for compatibility-sensitive behavior
+- Clear separation between ignore evaluation and tracked-file state from the Git index
 
 ## 🚀 Quick Example
 
@@ -28,6 +30,9 @@ var ruleSet = IgnoreRuleSet.ParseGitIgnore("""
     build/
     !build/keep.tmp
     """);
+var ignoreRuleSet = IgnoreRuleSet.Parse("""
+    *.cache
+    """, IgnoreDialect.IgnoreFile);
 var ignoreMatcher = new IgnoreMatcher(ruleSet);
 var ignored = ignoreMatcher.Evaluate("build/output.tmp").IsIgnored;
 

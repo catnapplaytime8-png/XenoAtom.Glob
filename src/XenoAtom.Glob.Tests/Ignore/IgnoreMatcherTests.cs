@@ -133,4 +133,10 @@ public class IgnoreMatcherTests
         Assert.IsTrue(ignored.IsIgnored);
         Assert.IsFalse(included.IsIgnored);
     }
+
+    [TestMethod]
+    public void ParseGitIgnore_ShouldRejectInvalidTrailingEscape()
+    {
+        Assert.Throws<ArgumentException>(() => IgnoreRuleSet.ParseGitIgnore("broken\\"));
+    }
 }

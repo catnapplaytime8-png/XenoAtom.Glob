@@ -103,6 +103,79 @@ public class FileTreeWalkerTests
     }
 
     [TestMethod]
+    public void Enumerate_ShouldHandleReusableRealisticRepositoryFixture()
+    {
+        using var fixture = new RepositoryFixtureBuilder();
+        fixture.CreateTypicalRepository()
+            .CreateDeepTree(depth: 6, filesPerDirectory: 2)
+            .CreateWideTree(directoryCount: 10, filesPerDirectory: 3);
+
+        var git = GitCli.In(fixture.Root.Path);
+        git.RunChecked("init", "--quiet");
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(fixture.Root.Path);
+        var entries = walker.Enumerate(fixture.Root.Path, new FileTreeWalkOptions { RepositoryContext = context }).ToArray();
+
+        Assert.IsTrue(entries.Any(static x => x.RelativePath == "README.md"));
+        Assert.IsTrue(entries.Any(static x => x.RelativePath == "src/app/app.cs"));
+        Assert.IsTrue(entries.Any(static x => x.RelativePath == "src/generated/include.txt"));
+        Assert.IsFalse(entries.Any(static x => x.RelativePath.StartsWith("bin/", StringComparison.Ordinal)));
+        Assert.IsFalse(entries.Any(static x => x.RelativePath.StartsWith("obj/", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldHandleManySmallGitIgnoreFiles()
+    {
+        using var fixture = new RepositoryFixtureBuilder();
+        fixture.CreateTypicalRepository()
+            .CreateManySmallIgnoreFiles(depth: 12, filesPerDirectory: 3);
+
+        var git = GitCli.In(fixture.Root.Path);
+        git.RunChecked("init", "--quiet");
+
+        var allFiles = Directory.GetFiles(fixture.Root.Path, "*", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(fixture.Root.Path, path).Replace('\\', '/'))
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+        var expected = QueryVisiblePathsFromGit(git, allFiles);
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(fixture.Root.Path);
+        var actual = walker.Enumerate(fixture.Root.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldAllowReincludedChildrenWhenDirectoryIsReachable()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText(".gitignore", """
+            generated/*
+            !generated/include.txt
+            """);
+        tempDirectory.WriteAllText("generated/include.txt", string.Empty);
+        tempDirectory.WriteAllText("generated/other.txt", string.Empty);
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+        var entries = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { ".gitignore", "generated/include.txt" }, entries);
+    }
+
+    [TestMethod]
     public void Enumerate_ShouldHonorCancellation()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -119,6 +192,31 @@ public class FileTreeWalkerTests
                 CancellationToken = cancellationTokenSource.Token,
             }).ToArray();
         });
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldNotFollowDirectorySymlinkByDefault_WhenSupported()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.CreateDirectory("real");
+        tempDirectory.WriteAllText("real/file.txt", string.Empty);
+
+        try
+        {
+            Directory.CreateSymbolicLink(tempDirectory.GetPath("linked"), tempDirectory.GetPath("real"));
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+        {
+            Assert.Inconclusive($"Symbolic links are not supported in this environment: {ex.Message}");
+        }
+
+        var walker = new FileTreeWalker();
+        var entries = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { IncludeDirectories = true })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { "real", "real/file.txt" }, entries);
     }
 
     private static string[] QueryVisiblePathsFromGit(GitCli git, IReadOnlyList<string> paths)

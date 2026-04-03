@@ -6,6 +6,7 @@ A gitignore compatible glob library.
 
 - `GlobPattern` for compiled path matching
 - `IgnoreRuleSet` and `IgnoreMatcher` for Git-compatible ignore evaluation
+- `IgnoreDialect` to select between `.gitignore` and `.ignore` parsing entry points
 - `RepositoryDiscovery` and `RepositoryContext` for Git working tree discovery
 - `FileTreeWalker` for ignore-aware traversal
 
@@ -43,6 +44,19 @@ var result = matcher.Evaluate("build/output.tmp");
 
 Later rule sets passed to `IgnoreMatcher` have higher precedence than earlier ones.
 
+For explicit dialect selection:
+
+```csharp
+var ignoreRules = IgnoreRuleSet.Parse("""
+    *.cache
+    """, IgnoreDialect.IgnoreFile);
+```
+
+Current dialect notes:
+
+- `IgnoreDialect.GitIgnore` is the Git-compatible path used throughout the repository-aware APIs.
+- `IgnoreDialect.IgnoreFile` currently reuses the same parser and evaluator semantics through an explicit adapter.
+
 ## Repository Discovery
 
 ```csharp
@@ -59,6 +73,11 @@ The implementation supports:
 - a `.git` gitfile that points to another Git directory
 - `.git/info/exclude`
 - `core.excludesFile`
+
+Current repository-aware scope:
+
+- ignore evaluation answers whether a path would be ignored by the ignore engine
+- tracked-file state from the Git index is intentionally out of scope for this release
 
 ## Tree Walking
 
@@ -94,3 +113,6 @@ The repository includes `src/XenoAtom.Glob.Benchmarks/` with BenchmarkDotNet ben
 - pattern compilation
 - single-path glob matching
 - ignore evaluation
+- traversal with and without ignore pruning
+
+The latest recorded short-run snapshot is available in [benchmarks/latest.md](./benchmarks/latest.md).

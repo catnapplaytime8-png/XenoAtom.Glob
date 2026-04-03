@@ -23,7 +23,7 @@ internal sealed class GlobCompiledSegment
 
     public string? LiteralText => IsLiteral ? string.Concat(Tokens.Select(static x => x.Literal)) : null;
 
-    public bool IsMatch(ReadOnlySpan<char> value)
+    public bool IsMatch(ReadOnlySpan<char> value, PathStringComparison comparison)
     {
         var tokenIndex = 0;
         var valueIndex = 0;
@@ -59,7 +59,7 @@ internal sealed class GlobCompiledSegment
 
                     case GlobTokenKind.Literal:
                         var literal = token.Literal.AsSpan();
-                        if (value[valueIndex..].StartsWith(literal, StringComparison.Ordinal))
+                        if (value[valueIndex..].StartsWith(literal, comparison.Value))
                         {
                             tokenIndex++;
                             valueIndex += literal.Length;

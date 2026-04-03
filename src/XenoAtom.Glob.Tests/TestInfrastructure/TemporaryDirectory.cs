@@ -45,6 +45,15 @@ internal sealed class TemporaryDirectory : IDisposable
 
     public void Dispose()
     {
+        var preserve = string.Equals(
+            Environment.GetEnvironmentVariable("XENOATOM_GLOB_KEEP_TEST_TEMP"),
+            "1",
+            StringComparison.Ordinal);
+        if (preserve)
+        {
+            return;
+        }
+
         try
         {
             if (Directory.Exists(Path))

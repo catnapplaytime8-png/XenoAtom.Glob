@@ -2,17 +2,52 @@ name: ci
 
 on:
   push:
-    paths-ignore:
-    - 'doc/**'
-    - 'img/**'
-    - 'readme.md'
   pull_request:
 
 jobs:
-  build:
-    runs-on: 'ubuntu-latest'
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
     steps:
-      - name: "Build, Test, Pack and Publish"
-        uses: xoofx/.github/.github/actions/dotnet-releaser-action@main
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+          global-json-file: src/global.json
+
+      - name: Verify Git Availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --version
+
+      - name: Restore
+        shell: bash
+        run: dotnet restore src/XenoAtom.Glob.slnx
+
+      - name: Build
+        shell: bash
+        run: dotnet build src/XenoAtom.Glob.slnx -c Release --no-restore
+
+      - name: Test
+        shell: bash
+        run: dotnet test src/XenoAtom.Glob.Tests/XenoAtom.Glob.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test-results.trx"
+
+      - name: Benchmark Smoke
+        shell: bash
+        run: dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --job short --warmupCount 1 --iterationCount 1 --filter "*.MatchLiteralPath" "*.EvaluateIgnoreDecision"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: src/XenoAtom.Glob.Tests/TestResults/**

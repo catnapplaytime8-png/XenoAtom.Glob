@@ -6,24 +6,24 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 
 ## 1. Delivery Rules
 
-- [ ] Treat [glob_library_specs.md](./glob_library_specs.md) as the behavioral contract.
-- [ ] Keep diffs focused and land work in self-contained steps.
-- [ ] Add tests before or with each behavior change.
+- [x] Treat [glob_library_specs.md](./glob_library_specs.md) as the behavioral contract.
+- [x] Keep diffs focused and land work in self-contained steps.
+- [x] Add tests before or with each behavior change.
 - [x] Keep `readme.md`, `doc/readme.md`, and the spec docs in sync with shipped behavior.
-- [ ] Do not defer correctness gaps behind undocumented TODO behavior.
+- [x] Do not defer correctness gaps behind undocumented TODO behavior.
 - [x] Run the full test suite before closing each milestone.
 
 ## 2. Milestone Overview
 
-- [ ] Milestone 0: Development foundation and quality harness
-- [ ] Milestone 1: Path model and normalization primitives
-- [ ] Milestone 2: Core glob parser and matcher
-- [ ] Milestone 3: `.gitignore` parser and rule compilation
-- [ ] Milestone 4: Ignore evaluation engine and explanation model
-- [ ] Milestone 5: Git-aware repository discovery
-- [ ] Milestone 6: File tree walker and traversal pruning
+- [x] Milestone 0: Development foundation and quality harness
+- [x] Milestone 1: Path model and normalization primitives
+- [x] Milestone 2: Core glob parser and matcher
+- [x] Milestone 3: `.gitignore` parser and rule compilation
+- [x] Milestone 4: Ignore evaluation engine and explanation model
+- [x] Milestone 5: Git-aware repository discovery
+- [x] Milestone 6: File tree walker and traversal pruning
 - [ ] Milestone 7: Performance tuning and benchmark hardening
-- [ ] Milestone 8: Additional ignore dialect hooks
+- [x] Milestone 8: Additional ignore dialect hooks
 - [ ] Milestone 9: API review, documentation, and release readiness
 
 ## 3. Milestone 0: Development Foundation And Quality Harness
@@ -34,8 +34,8 @@ The intent is to give an implementer a concrete sequence of work, explicit quali
 - [x] Set up test helper infrastructure for temporary directories, temporary repositories, and path corpus generation.
 - [x] Add a benchmark project or benchmark folder strategy for later BenchmarkDotNet coverage.
 - [x] Add shared test utilities for path normalization, file layout creation, and Git CLI invocation.
-- [ ] Add CI expectations for unit tests, Git differential tests, and benchmarks that are safe to run in CI.
-- [ ] Require Git to be present in CI on supported platforms and fail fast with a clear message when the differential suite cannot run in environments where it is expected.
+- [x] Add CI expectations for unit tests, Git differential tests, and benchmarks that are safe to run in CI.
+- [x] Require Git to be present in CI on supported platforms and fail fast with a clear message when the differential suite cannot run in environments where it is expected.
 - [x] Add a small test helper that captures and prints `git --version` in differential test runs.
 
 Exit criteria:
@@ -50,7 +50,7 @@ Exit criteria:
 - [x] Encode directory/file distinction separately from the path text.
 - [x] Implement validation rules for relative paths used by the matcher and ignore engine.
 - [x] Add low-allocation helpers for slicing segments from normalized paths.
-- [ ] Decide and document the internal comparison strategy abstraction needed for case-sensitive versus case-insensitive scenarios.
+- [x] Decide and document the internal comparison strategy abstraction needed for case-sensitive versus case-insensitive scenarios.
 
 Tests:
 
@@ -58,21 +58,21 @@ Tests:
 - [x] Unit tests for duplicate separators, `.` segments, empty segments, and trailing separator handling.
 - [x] Unit tests for directory flag handling independent of trailing slash input.
 - [x] Unit tests for invalid input rejection behavior.
-- [ ] Property-style tests for path normalization invariants on random segment combinations.
+- [x] Property-style tests for path normalization invariants on random segment combinations.
 
 Exit criteria:
 
-- [ ] All path consumers can operate on a normalized path representation without calling `Path.GetRelativePath`.
-- [ ] Hot-path helpers have allocation behavior measured and documented.
+- [x] All path consumers can operate on a normalized path representation without calling `Path.GetRelativePath`.
+- [x] Hot-path helpers have allocation behavior measured and documented.
 
 ## 5. Milestone 2: Core Glob Parser And Matcher
 
 - [x] Implement `GlobPattern` parsing for literals, `*`, `?`, character classes, escapes, and `**`.
 - [x] Define a stable representation for compiled tokens and compiled segments.
 - [x] Implement specialized matchers for literal path, literal name, suffix, prefix, single-segment wildcard, and general recursive glob.
-- [ ] Add directory-aware matching hooks needed by ignore semantics.
+- [x] Add directory-aware matching hooks needed by ignore semantics.
 - [x] Define invalid-pattern behavior and expose it through parse results rather than exceptions in normal control flow.
-- [ ] Add a small diagnostic representation for parser debugging that is not used in hot paths.
+- [x] Add a small diagnostic representation for parser debugging that is not used in hot paths.
 
 Tests:
 
@@ -82,13 +82,13 @@ Tests:
 - [x] Unit tests for `**/foo`, `foo/**`, `a/**/b`, and adjacent wildcard combinations.
 - [x] Unit tests for segment-boundary behavior where `*` and `?` must not cross `/`.
 - [x] Unit tests for invalid bracket expressions and trailing backslash handling.
-- [ ] Property-style tests comparing specialized matcher results against the general matcher on generated cases.
-- [ ] Microbenchmarks for compile cost and single-pattern match throughput.
+- [x] Property-style tests comparing specialized matcher results against the general matcher on generated cases.
+- [x] Microbenchmarks for compile cost and single-pattern match throughput.
 
 Exit criteria:
 
 - [x] The glob engine is usable without any ignore-file infrastructure.
-- [ ] Specialized and fallback matchers produce identical results for the same semantic input.
+- [x] Specialized and fallback matchers produce identical results for the same semantic input.
 
 ## 6. Milestone 3: `.gitignore` Parser And Rule Compilation
 
@@ -104,8 +104,8 @@ Tests:
 - [x] Unit tests for blank lines, comments, escaped `#`, escaped `!`, and escaped spaces.
 - [x] Unit tests for leading slash, middle slash, no slash, and trailing slash semantics at parse level.
 - [x] Unit tests for line numbering and source metadata preservation.
-- [ ] Unit tests for invalid lines and invalid escape endings.
-- [ ] Corpus tests with curated `.gitignore` snippets covering common and obscure forms.
+- [x] Unit tests for invalid lines and invalid escape endings.
+- [x] Corpus tests with curated `.gitignore` snippets covering common and obscure forms.
 
 Exit criteria:
 
@@ -140,8 +140,8 @@ Differential tests:
 - [x] Include cases for `.gitignore`, `.git/info/exclude`, and `core.excludesFile`.
 - [x] Include cases with nested `.gitignore` files and conflicting rules.
 - [x] Include cases with CRLF rule files, escaped spaces, escaped leading `!`, and complex `**` patterns.
-- [ ] Include cases that intentionally probe documented Git limitations such as failed re-inclusion below excluded directories.
-- [ ] Store fixture definitions in a reusable corpus format so regressions can be reproduced exactly.
+- [x] Include cases that intentionally probe documented Git limitations such as failed re-inclusion below excluded directories.
+- [x] Store fixture definitions in a reusable corpus format so regressions can be reproduced exactly.
 
 Exit criteria:
 
@@ -155,14 +155,14 @@ Exit criteria:
 - [x] Resolve `.git/info/exclude` from discovered metadata.
 - [x] Resolve the global exclude file from Git configuration or from an explicitly supplied resolved path, depending on the chosen API decision.
 - [x] Make repository discovery explicit and reusable rather than burying it inside traversal.
-- [ ] Document any intentionally deferred repository behaviors.
+- [x] Document any intentionally deferred repository behaviors.
 
 Tests:
 
 - [x] Unit tests for repository discovery when `.git` is a directory.
 - [x] Unit tests for repository discovery when `.git` is a gitfile with a relative path.
 - [x] Unit tests for worktree-like metadata layouts.
-- [ ] Unit tests for submodule-like gitfile layouts.
+- [x] Unit tests for submodule-like gitfile layouts.
 - [x] Unit tests for missing or malformed gitfile content.
 - [x] Differential tests proving the discovered root, git dir, and ignore sources match what Git reports for the same temporary repository.
 - [x] Validate repository discovery against `git rev-parse --show-toplevel` and `git rev-parse --git-dir`.
@@ -187,19 +187,19 @@ Tests:
 - [x] Unit tests for flat directory enumeration with no ignore rules.
 - [x] Unit tests for nested traversal with parent and child `.gitignore` files.
 - [x] Unit tests proving excluded directories are pruned and not descended into.
-- [ ] Unit tests proving reachable directories can still re-include children when allowed.
+- [x] Unit tests proving reachable directories can still re-include children when allowed.
 - [x] Unit tests for `.gitignore` loading only from directories actually entered.
-- [ ] Unit tests for symlink or reparse-point handling where supported by the platform.
+- [x] Unit tests for symlink or reparse-point handling where supported by the platform.
 - [x] Integration tests over realistic directory trees with mixed files, directories, and ignore rules.
 - [x] Differential traversal tests that compare the resulting visible path set to a Git-derived expected set in supported scenarios.
 - [x] Differential traversal tests that also compare per-entry ignore decisions against `git check-ignore` for the same fixture paths.
 
 Performance tests:
 
-- [ ] Benchmarks for traversal with no ignore rules.
-- [ ] Benchmarks for traversal with shallow ignore stacks.
-- [ ] Benchmarks for traversal with deep nested ignore stacks.
-- [ ] Benchmarks for traversal where most entries are pruned early.
+- [x] Benchmarks for traversal with no ignore rules.
+- [x] Benchmarks for traversal with shallow ignore stacks.
+- [x] Benchmarks for traversal with deep nested ignore stacks.
+- [x] Benchmarks for traversal where most entries are pruned early.
 
 Exit criteria:
 
@@ -208,34 +208,34 @@ Exit criteria:
 
 ## 10. Milestone 7: Performance Tuning And Benchmark Hardening
 
-- [ ] Establish representative benchmark corpora: small, medium, large, deep, wildcard-heavy, and ignore-heavy.
-- [ ] Measure allocations and throughput for path normalization, pattern compilation, matching, ignore evaluation, and traversal.
+- [x] Establish representative benchmark corpora: small, medium, large, deep, wildcard-heavy, and ignore-heavy.
+- [x] Measure allocations and throughput for path normalization, pattern compilation, matching, ignore evaluation, and traversal.
 - [ ] Identify high-allocation hot spots with profiler-backed inspection.
-- [ ] Introduce pooling or data-structure changes only when measurement justifies them.
-- [ ] Verify optimizations do not change semantics by running the full correctness suite after each tuning step.
-- [ ] Document expected performance characteristics and known tradeoffs.
+- [x] Introduce pooling or data-structure changes only when measurement justifies them.
+- [x] Verify optimizations do not change semantics by running the full correctness suite after each tuning step.
+- [x] Document expected performance characteristics and known tradeoffs.
 
 Benchmark gates:
 
-- [ ] Benchmark results are reproducible enough to detect regressions.
+- [x] Benchmark results are reproducible enough to detect regressions.
 - [ ] Allocation counts for skipped entries remain near-zero in the intended steady state.
-- [ ] No optimization lands without a before-and-after measurement.
+- [x] No optimization lands without a before-and-after measurement.
 
 ## 11. Milestone 8: Additional Ignore Dialect Hooks
 
-- [ ] Extract the parser and rule-evaluation seams needed for additional dialects without weakening `.gitignore` correctness.
-- [ ] Add internal or public dialect abstractions only if they stay small and concrete.
-- [ ] Prototype the first follow-up dialect support path, likely `.ignore` or `.dockerignore`, behind a focused adapter model.
-- [ ] Document exactly what is shared and what remains dialect-specific.
+- [x] Extract the parser and rule-evaluation seams needed for additional dialects without weakening `.gitignore` correctness.
+- [x] Add internal or public dialect abstractions only if they stay small and concrete.
+- [x] Prototype the first follow-up dialect support path, likely `.ignore` or `.dockerignore`, behind a focused adapter model.
+- [x] Document exactly what is shared and what remains dialect-specific.
 
 Tests:
 
-- [ ] Unit tests proving `.gitignore` semantics remain unchanged after introducing dialect extension points.
-- [ ] Unit tests for any newly introduced dialect adapter behavior.
+- [x] Unit tests proving `.gitignore` semantics remain unchanged after introducing dialect extension points.
+- [x] Unit tests for any newly introduced dialect adapter behavior.
 
 Exit criteria:
 
-- [ ] `.gitignore` remains the reference-quality path while extension points stay restrained.
+- [x] `.gitignore` remains the reference-quality path while extension points stay restrained.
 
 ## 12. Milestone 9: API Review, Documentation, And Release Readiness
 
@@ -244,15 +244,15 @@ Exit criteria:
 - [x] Add XML docs for all public APIs, including exceptions and behavioral caveats.
 - [x] Update `readme.md` with the final capability set and usage examples.
 - [x] Update `doc/readme.md` with a more detailed guide for globbing, ignore evaluation, and traversal.
-- [ ] Cross-check this plan and the spec against the actual implementation and mark deferred items explicitly.
+- [x] Cross-check this plan and the spec against the actual implementation and mark deferred items explicitly.
 - [x] Add examples for standalone glob use, standalone ignore use, and repository traversal use.
 - [x] Review AOT and trimming compatibility warnings and resolve or document them.
 
 Release gate:
 
 - [ ] All tests pass locally and in CI.
-- [ ] Differential compatibility suite is green.
-- [ ] Benchmark results are recorded for the release candidate.
+- [x] Differential compatibility suite is green.
+- [x] Benchmark results are recorded for the release candidate.
 - [x] Docs match the shipped API and behavior.
 
 ## 13. Top-Confidence Test Plan
@@ -269,7 +269,7 @@ This section is the quality backbone for the project and should be treated as ma
 - [x] Negation and pruning tests
 - [x] Repository discovery tests
 - [x] Traversal tests
-- [ ] Public API guard tests for argument validation and XML-doc-covered behavior
+- [x] Public API guard tests for argument validation and XML-doc-covered behavior
 
 ### 13.2 Differential Compatibility Matrix
 
@@ -287,41 +287,41 @@ This section is the quality backbone for the project and should be treated as ma
 
 ### 13.3 Cross-Platform Matrix
 
-- [ ] Run the full suite on Windows.
+- [x] Run the full suite on Windows.
 - [ ] Run the full suite on Linux.
 - [ ] Run the full suite on macOS.
-- [ ] Ensure platform-conditional expectations are explicit and localized in the tests.
-- [ ] Add targeted tests for separator handling and platform-specific path edge cases.
+- [x] Ensure platform-conditional expectations are explicit and localized in the tests.
+- [x] Add targeted tests for separator handling and platform-specific path edge cases.
 
 ### 13.4 Fuzz And Property Coverage
 
-- [ ] Add property-style tests for normalization and matcher invariants.
-- [ ] Add parser fuzz-style inputs for malformed bracket expressions, dangling escapes, unusual whitespace, and repeated separators.
-- [ ] Add generated corpus tests that compare specialized matchers with the fallback matcher.
-- [ ] Add generated ignore corpora for rule-order and negation invariants.
+- [x] Add property-style tests for normalization and matcher invariants.
+- [x] Add parser fuzz-style inputs for malformed bracket expressions, dangling escapes, unusual whitespace, and repeated separators.
+- [x] Add generated corpus tests that compare specialized matchers with the fallback matcher.
+- [x] Add generated ignore corpora for rule-order and negation invariants.
 
 ### 13.5 Realistic Integration Corpora
 
-- [ ] Build reusable file-tree fixtures that look like real repositories with nested source, build, temp, package, and tool output directories.
-- [ ] Add deep-tree fixtures to exercise pruning and stack behavior.
-- [ ] Add fixtures with large sibling counts to stress enumeration.
-- [ ] Add fixtures with many small `.gitignore` files to stress rule-stack updates.
+- [x] Build reusable file-tree fixtures that look like real repositories with nested source, build, temp, package, and tool output directories.
+- [x] Add deep-tree fixtures to exercise pruning and stack behavior.
+- [x] Add fixtures with large sibling counts to stress enumeration.
+- [x] Add fixtures with many small `.gitignore` files to stress rule-stack updates.
 
 ### 13.6 Performance Regression Coverage
 
-- [ ] Benchmark pattern compilation throughput.
-- [ ] Benchmark single-path match throughput.
-- [ ] Benchmark ignore evaluation throughput with 1, 10, 100, and 1000 effective rules.
-- [ ] Benchmark traversal throughput on small, medium, and large trees.
-- [ ] Track allocations for hot scenarios.
-- [ ] Add regression thresholds or recorded baselines where CI noise permits.
+- [x] Benchmark pattern compilation throughput.
+- [x] Benchmark single-path match throughput.
+- [x] Benchmark ignore evaluation throughput with 1, 10, 100, and 1000 effective rules.
+- [x] Benchmark traversal throughput on small, medium, and large trees.
+- [x] Track allocations for hot scenarios.
+- [x] Add regression thresholds or recorded baselines where CI noise permits.
 
 ### 13.7 Failure Analysis Tooling
 
-- [ ] Ensure test failures print enough diagnostics to compare the library result and Git result quickly.
-- [ ] Provide helper assertions that print normalized path, directory flag, winning rule metadata, and evaluated rule stack.
-- [ ] Preserve temporary fixtures for failed differential tests when explicitly requested by a debug flag.
-- [ ] Include the exact Git command, Git version, working directory, and relevant fixture files in differential failure output.
+- [x] Ensure test failures print enough diagnostics to compare the library result and Git result quickly.
+- [x] Provide helper assertions that print normalized path, directory flag, winning rule metadata, and evaluated rule stack.
+- [x] Preserve temporary fixtures for failed differential tests when explicitly requested by a debug flag.
+- [x] Include the exact Git command, Git version, working directory, and relevant fixture files in differential failure output.
 
 ## 14. Suggested Commit Sequence
 
@@ -340,8 +340,8 @@ This section is the quality backbone for the project and should be treated as ma
 
 ## 15. Definition Of Done
 
-- [ ] The implementation satisfies the behavioral requirements in [glob_library_specs.md](./glob_library_specs.md).
+- [x] The implementation satisfies the behavioral requirements in [glob_library_specs.md](./glob_library_specs.md).
 - [ ] The test suite gives high confidence across unit, differential, integration, cross-platform, and performance coverage.
-- [ ] Git CLI differential tests are part of the normal validation path, not an occasional manual verification step.
-- [ ] The public API is documented, coherent, and small enough to remain maintainable.
-- [ ] The library is ready to be consumed as a single package for standalone globbing, ignore evaluation, and Git-compatible repository traversal.
+- [x] Git CLI differential tests are part of the normal validation path, not an occasional manual verification step.
+- [x] The public API is documented, coherent, and small enough to remain maintainable.
+- [x] The library is ready to be consumed as a single package for standalone globbing, ignore evaluation, and Git-compatible repository traversal.

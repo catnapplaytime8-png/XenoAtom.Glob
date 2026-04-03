@@ -15,4 +15,10 @@
     <ProjectReference Include="..\XenoAtom.Glob\XenoAtom.Glob.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Assets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

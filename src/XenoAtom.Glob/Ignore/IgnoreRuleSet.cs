@@ -26,30 +26,71 @@ public sealed class IgnoreRuleSet
     /// <summary>
     /// Parses a Git-compatible ignore file from a character span.
     /// </summary>
-    /// <param name="content">The ignore file content.</param>
-    /// <param name="baseDirectory">The directory containing the ignore file, relative to the evaluation root.</param>
-    /// <param name="sourcePath">The optional source path used for diagnostics.</param>
-    /// <param name="sourceKind">The rule source kind.</param>
-    /// <returns>A parsed ignore rule set.</returns>
     public static IgnoreRuleSet ParseGitIgnore(
         ReadOnlySpan<char> content,
         string? baseDirectory = null,
         string? sourcePath = null,
         IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
     {
-        return ParseGitIgnore(content.ToString(), baseDirectory, sourcePath, sourceKind);
+        return Parse(content.ToString(), IgnoreDialect.GitIgnore, baseDirectory, sourcePath, sourceKind);
     }
 
     /// <summary>
     /// Parses a Git-compatible ignore file.
     /// </summary>
-    /// <param name="content">The ignore file content.</param>
-    /// <param name="baseDirectory">The directory containing the ignore file, relative to the evaluation root.</param>
-    /// <param name="sourcePath">The optional source path used for diagnostics.</param>
-    /// <param name="sourceKind">The rule source kind.</param>
-    /// <returns>A parsed ignore rule set.</returns>
     public static IgnoreRuleSet ParseGitIgnore(
         string content,
+        string? baseDirectory = null,
+        string? sourcePath = null,
+        IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
+    {
+        return Parse(content, IgnoreDialect.GitIgnore, baseDirectory, sourcePath, sourceKind);
+    }
+
+    /// <summary>
+    /// Parses a Git-compatible ignore file from a text reader.
+    /// </summary>
+    public static IgnoreRuleSet ParseGitIgnore(
+        TextReader reader,
+        string? baseDirectory = null,
+        string? sourcePath = null,
+        IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
+    {
+        return Parse(reader, IgnoreDialect.GitIgnore, baseDirectory, sourcePath, sourceKind);
+    }
+
+    /// <summary>
+    /// Parses a Git-compatible ignore file from a stream.
+    /// </summary>
+    public static IgnoreRuleSet ParseGitIgnore(
+        Stream stream,
+        string? baseDirectory = null,
+        string? sourcePath = null,
+        IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory,
+        Encoding? encoding = null)
+    {
+        return Parse(stream, IgnoreDialect.GitIgnore, baseDirectory, sourcePath, sourceKind, encoding);
+    }
+
+    /// <summary>
+    /// Parses an ignore file using the specified dialect from a character span.
+    /// </summary>
+    public static IgnoreRuleSet Parse(
+        ReadOnlySpan<char> content,
+        IgnoreDialect dialect,
+        string? baseDirectory = null,
+        string? sourcePath = null,
+        IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
+    {
+        return Parse(content.ToString(), dialect, baseDirectory, sourcePath, sourceKind);
+    }
+
+    /// <summary>
+    /// Parses an ignore file using the specified dialect.
+    /// </summary>
+    public static IgnoreRuleSet Parse(
+        string content,
+        IgnoreDialect dialect,
         string? baseDirectory = null,
         string? sourcePath = null,
         IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
@@ -60,39 +101,36 @@ public sealed class IgnoreRuleSet
             ? string.Empty
             : PathNormalizer.NormalizeRelativePath(baseDirectory!, isDirectory: true).Value;
 
-        var rules = GitIgnoreParser.Parse(content, normalizedBaseDirectory, sourcePath, sourceKind);
+        var rules = dialect switch
+        {
+            IgnoreDialect.GitIgnore => GitIgnoreParser.Parse(content, normalizedBaseDirectory, sourcePath, sourceKind),
+            IgnoreDialect.IgnoreFile => GitIgnoreParser.Parse(content, normalizedBaseDirectory, sourcePath, sourceKind),
+            _ => throw new ArgumentOutOfRangeException(nameof(dialect)),
+        };
+
         return new IgnoreRuleSet(rules);
     }
 
     /// <summary>
-    /// Parses a Git-compatible ignore file from a text reader.
+    /// Parses an ignore file using the specified dialect from a text reader.
     /// </summary>
-    /// <param name="reader">The text reader supplying the ignore file content.</param>
-    /// <param name="baseDirectory">The directory containing the ignore file, relative to the evaluation root.</param>
-    /// <param name="sourcePath">The optional source path used for diagnostics.</param>
-    /// <param name="sourceKind">The rule source kind.</param>
-    /// <returns>A parsed ignore rule set.</returns>
-    public static IgnoreRuleSet ParseGitIgnore(
+    public static IgnoreRuleSet Parse(
         TextReader reader,
+        IgnoreDialect dialect,
         string? baseDirectory = null,
         string? sourcePath = null,
         IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
     {
         ArgumentNullException.ThrowIfNull(reader);
-        return ParseGitIgnore(reader.ReadToEnd(), baseDirectory, sourcePath, sourceKind);
+        return Parse(reader.ReadToEnd(), dialect, baseDirectory, sourcePath, sourceKind);
     }
 
     /// <summary>
-    /// Parses a Git-compatible ignore file from a stream.
+    /// Parses an ignore file using the specified dialect from a stream.
     /// </summary>
-    /// <param name="stream">The stream containing the ignore file content.</param>
-    /// <param name="baseDirectory">The directory containing the ignore file, relative to the evaluation root.</param>
-    /// <param name="sourcePath">The optional source path used for diagnostics.</param>
-    /// <param name="sourceKind">The rule source kind.</param>
-    /// <param name="encoding">The optional text encoding. UTF-8 is used by default.</param>
-    /// <returns>A parsed ignore rule set.</returns>
-    public static IgnoreRuleSet ParseGitIgnore(
+    public static IgnoreRuleSet Parse(
         Stream stream,
+        IgnoreDialect dialect,
         string? baseDirectory = null,
         string? sourcePath = null,
         IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory,
@@ -101,6 +139,18 @@ public sealed class IgnoreRuleSet
         ArgumentNullException.ThrowIfNull(stream);
 
         using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-        return ParseGitIgnore(reader.ReadToEnd(), baseDirectory, sourcePath, sourceKind);
+        return Parse(reader.ReadToEnd(), dialect, baseDirectory, sourcePath, sourceKind);
+    }
+
+    /// <summary>
+    /// Parses an <c>.ignore</c> file using the current dialect implementation.
+    /// </summary>
+    public static IgnoreRuleSet ParseIgnoreFile(
+        string content,
+        string? baseDirectory = null,
+        string? sourcePath = null,
+        IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
+    {
+        return Parse(content, IgnoreDialect.IgnoreFile, baseDirectory, sourcePath, sourceKind);
     }
 }

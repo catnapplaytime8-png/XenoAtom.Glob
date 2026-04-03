@@ -11,6 +11,7 @@ namespace XenoAtom.Glob.Ignore;
 /// </summary>
 public sealed class IgnoreMatcher
 {
+    private static readonly PathStringComparison DefaultComparison = PathStringComparison.CurrentPlatformDefault;
     private readonly IReadOnlyList<IgnoreRuleSet> _ruleSets;
 
     /// <summary>
@@ -48,22 +49,42 @@ public sealed class IgnoreMatcher
 
     internal IgnoreEvaluationResult Evaluate(NormalizedPath normalizedPath)
     {
-        var segments = SplitSegments(normalizedPath.Value);
+        return EvaluateInternal(normalizedPath, captureTrace: false).Result;
+    }
 
-        for (var depth = 0; depth < segments.Length - (normalizedPath.IsDirectory ? 0 : 1); depth++)
+    internal IgnoreEvaluationTrace EvaluateWithTrace(string path, bool isDirectory = false)
+    {
+        var normalizedPath = PathNormalizer.NormalizeRelativePath(path, isDirectory);
+        return EvaluateInternal(normalizedPath, captureTrace: true);
+    }
+
+    internal IgnoreEvaluationTrace EvaluateWithTrace(NormalizedPath normalizedPath)
+    {
+        return EvaluateInternal(normalizedPath, captureTrace: true);
+    }
+
+    private IgnoreEvaluationTrace EvaluateInternal(NormalizedPath normalizedPath, bool captureTrace)
+    {
+        List<IgnoreRule>? trace = captureTrace ? [] : null;
+        var path = normalizedPath.Value;
+        for (var index = 0; index < path.Length; index++)
         {
-            var directoryPrefix = string.Join('/', segments.Take(depth + 1));
-            var directoryDecision = EvaluateSinglePath(directoryPrefix, isDirectory: true);
+            if (path[index] != '/')
+            {
+                continue;
+            }
+
+            var directoryDecision = EvaluateSinglePath(path, index, isDirectory: true, trace);
             if (directoryDecision.IsMatch && directoryDecision.IsIgnored)
             {
-                return directoryDecision;
+                return new IgnoreEvaluationTrace(directoryDecision, trace ?? []);
             }
         }
 
-        return EvaluateSinglePath(normalizedPath.Value, normalizedPath.IsDirectory);
+        return new IgnoreEvaluationTrace(EvaluateSinglePath(path, path.Length, normalizedPath.IsDirectory, trace), trace ?? []);
     }
 
-    private IgnoreEvaluationResult EvaluateSinglePath(string candidatePath, bool isDirectory)
+    private IgnoreEvaluationResult EvaluateSinglePath(string candidatePath, int candidateLength, bool isDirectory, List<IgnoreRule>? trace)
     {
         IgnoreRule? winningRule = null;
         var ignored = false;
@@ -72,11 +93,12 @@ public sealed class IgnoreMatcher
         {
             foreach (var rule in ruleSet.Rules)
             {
-                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory))
+                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, candidateLength, isDirectory, DefaultComparison))
                 {
                     continue;
                 }
 
+                trace?.Add(rule);
                 winningRule = rule;
                 ignored = !rule.IsNegated;
             }
@@ -85,15 +107,5 @@ public sealed class IgnoreMatcher
         return winningRule is null
             ? default
             : new IgnoreEvaluationResult(true, ignored, winningRule);
-    }
-
-    private static string[] SplitSegments(string path)
-    {
-        if (path.Length == 0)
-        {
-            return [];
-        }
-
-        return path.Split('/');
     }
 }
