@@ -261,6 +261,10 @@ Release gate:
 - [x] Benchmark results are recorded for the release candidate.
 - [x] Docs match the shipped API and behavior.
 
+Operational note:
+
+- Hosted CI execution and macOS validation require access to a configured remote repository and runner infrastructure. They remain explicit release-validation gates and must not be checked from local-only implementation work unless those runs have actually completed.
+
 ## 13. Top-Confidence Test Plan
 
 This section is the quality backbone for the project and should be treated as mandatory work, not optional hardening.
@@ -352,3 +356,7 @@ This section is the quality backbone for the project and should be treated as ma
 - [x] Git CLI differential tests are part of the normal validation path, not an occasional manual verification step.
 - [x] The public API is documented, coherent, and small enough to remain maintainable.
 - [x] The library is ready to be consumed as a single package for standalone globbing, ignore evaluation, and Git-compatible repository traversal.
+
+Remaining external validation:
+
+- The unchecked release-validation items are operational, not implementation gaps: hosted CI execution, macOS execution, and the final confidence gate that depends on those runs.

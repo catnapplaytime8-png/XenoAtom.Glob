@@ -662,6 +662,10 @@ The first production-quality release of this library should satisfy all of the f
 - Documentation describing supported behavior and any explicitly deferred cases.
 - Benchmark evidence showing low-allocation steady-state traversal and competitive matching throughput.
 
+Hosted validation note:
+
+- Actual CI completion and macOS execution remain operational release-validation requirements. They are not satisfied by local implementation alone and must be recorded only after those environments have run the suite successfully.
+
 ## 20. Open Decisions To Resolve During Implementation
 
 These decisions should be finalized early and then documented in the user guide:
