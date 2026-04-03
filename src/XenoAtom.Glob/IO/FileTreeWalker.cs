@@ -2,6 +2,7 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using System.Buffers;
 using System.IO.Enumeration;
 
 using XenoAtom.Glob.Git;
@@ -66,22 +67,24 @@ public sealed class FileTreeWalker
                 continue;
             }
 
-            var relativePath = relativeDirectory.Length == 0 ? entry.Name : $"{relativeDirectory}/{entry.Name}";
-            var ignored = ignoreStack.Matcher.Evaluate(relativePath, entry.IsDirectory);
+            var ignored = EvaluateIgnore(ignoreStack.Matcher, relativeDirectory, entry.Name, entry.IsDirectory);
             if (ignored.IsIgnored)
             {
                 continue;
             }
 
+            var relativePath = relativeDirectory.Length == 0 ? entry.Name : $"{relativeDirectory}/{entry.Name}";
+            var fullPath = Path.Join(directoryPath, entry.Name);
+
             if (entry.IsDirectory)
             {
                 if (options.IncludeDirectories)
                 {
-                    yield return new FileTreeEntry(relativePath, entry.FullPath, true);
+                    yield return new FileTreeEntry(relativePath, fullPath, true);
                 }
 
                 var childIgnoreStack = ignoreStack.PushDirectory(repositoryContext, relativePath);
-                foreach (var childEntry in EnumerateCore(entry.FullPath, relativePath, childIgnoreStack, options, repositoryContext))
+                foreach (var childEntry in EnumerateCore(fullPath, relativePath, childIgnoreStack, options, repositoryContext))
                 {
                     yield return childEntry;
                 }
@@ -89,7 +92,7 @@ public sealed class FileTreeWalker
                 continue;
             }
 
-            yield return new FileTreeEntry(relativePath, entry.FullPath, false);
+            yield return new FileTreeEntry(relativePath, fullPath, false);
         }
     }
 
@@ -132,7 +135,6 @@ public sealed class FileTreeWalker
             directoryPath,
             static (ref FileSystemEntry entry) => new RawFileSystemEntry(
                 entry.FileName.ToString(),
-                entry.ToFullPath(),
                 entry.IsDirectory,
                 (entry.Attributes & FileAttributes.ReparsePoint) != 0),
             enumerationOptions);
@@ -143,5 +145,37 @@ public sealed class FileTreeWalker
         }
     }
 
-    private readonly record struct RawFileSystemEntry(string Name, string FullPath, bool IsDirectory, bool IsReparsePoint);
+    private static IgnoreEvaluationResult EvaluateIgnore(IgnoreMatcher matcher, string relativeDirectory, string entryName, bool isDirectory)
+        => EvaluateIgnore(matcher, relativeDirectory, entryName.AsSpan(), isDirectory);
+
+    private static IgnoreEvaluationResult EvaluateIgnore(IgnoreMatcher matcher, string relativeDirectory, ReadOnlySpan<char> entryName, bool isDirectory)
+    {
+        if (relativeDirectory.Length == 0)
+        {
+            return matcher.EvaluateNormalized(entryName, isDirectory);
+        }
+
+        var totalLength = relativeDirectory.Length + 1 + entryName.Length;
+        char[]? rentedBuffer = null;
+        var buffer = totalLength <= 256
+            ? stackalloc char[totalLength]
+            : (rentedBuffer = ArrayPool<char>.Shared.Rent(totalLength));
+
+        try
+        {
+            relativeDirectory.AsSpan().CopyTo(buffer);
+            buffer[relativeDirectory.Length] = '/';
+            entryName.CopyTo(buffer[(relativeDirectory.Length + 1)..]);
+            return matcher.EvaluateNormalized(buffer[..totalLength], isDirectory);
+        }
+        finally
+        {
+            if (rentedBuffer is not null)
+            {
+                ArrayPool<char>.Shared.Return(rentedBuffer);
+            }
+        }
+    }
+
+    private readonly record struct RawFileSystemEntry(string Name, bool IsDirectory, bool IsReparsePoint);
 }

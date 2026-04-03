@@ -77,32 +77,45 @@ public sealed class RepositoryContext
 
     internal IReadOnlyList<IgnoreRuleSet> CreateChildRuleSets(IReadOnlyList<IgnoreRuleSet> currentRuleSets, string childRelativeDirectory)
     {
-        var ruleSets = new List<IgnoreRuleSet>(currentRuleSets);
-        TryAddDirectoryRuleSet(ruleSets, childRelativeDirectory);
+        if (!TryLoadDirectoryRuleSet(childRelativeDirectory, out var ruleSet))
+        {
+            return currentRuleSets;
+        }
+
+        var ruleSets = new List<IgnoreRuleSet>(currentRuleSets.Count + 1);
+        ruleSets.AddRange(currentRuleSets);
+        ruleSets.Add(ruleSet);
         return ruleSets;
     }
 
     private void TryAddDirectoryRuleSet(List<IgnoreRuleSet> ruleSets, string relativeDirectory)
     {
+        if (!TryLoadDirectoryRuleSet(relativeDirectory, out var ruleSet))
+        {
+            return;
+        }
+
+        ruleSets.Add(ruleSet);
+    }
+
+    private bool TryLoadDirectoryRuleSet(string relativeDirectory, out IgnoreRuleSet ruleSet)
+    {
         var gitIgnorePath = relativeDirectory.Length == 0
             ? Path.Combine(WorkingTreeRoot, ".gitignore")
             : Path.Combine(WorkingTreeRoot, relativeDirectory.Replace('/', Path.DirectorySeparatorChar), ".gitignore");
 
-        if (!File.Exists(gitIgnorePath))
+        if (!File.Exists(gitIgnorePath) || IsSymlink(gitIgnorePath))
         {
-            return;
+            ruleSet = null!;
+            return false;
         }
 
-        if (IsSymlink(gitIgnorePath))
-        {
-            return;
-        }
-
-        ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+        ruleSet = IgnoreRuleSet.ParseGitIgnore(
             File.ReadAllText(gitIgnorePath),
             baseDirectory: relativeDirectory,
             sourcePath: gitIgnorePath,
-            sourceKind: IgnoreRuleSourceKind.PerDirectory));
+            sourceKind: IgnoreRuleSourceKind.PerDirectory);
+        return true;
     }
 
     private static bool IsSymlink(string path)

@@ -47,6 +47,25 @@ public sealed class IgnoreMatcher
         return Evaluate(normalizedPath);
     }
 
+    internal IgnoreEvaluationResult EvaluateNormalized(ReadOnlySpan<char> normalizedPath, bool isDirectory)
+    {
+        for (var index = 0; index < normalizedPath.Length; index++)
+        {
+            if (normalizedPath[index] != '/')
+            {
+                continue;
+            }
+
+            var directoryDecision = EvaluateSinglePath(normalizedPath[..index], isDirectory: true);
+            if (directoryDecision.IsMatch && directoryDecision.IsIgnored)
+            {
+                return directoryDecision;
+            }
+        }
+
+        return EvaluateSinglePath(normalizedPath, isDirectory);
+    }
+
     internal IgnoreEvaluationResult Evaluate(NormalizedPath normalizedPath)
     {
         return EvaluateInternal(normalizedPath, captureTrace: false).Result;
@@ -99,6 +118,30 @@ public sealed class IgnoreMatcher
                 }
 
                 trace?.Add(rule);
+                winningRule = rule;
+                ignored = !rule.IsNegated;
+            }
+        }
+
+        return winningRule is null
+            ? default
+            : new IgnoreEvaluationResult(true, ignored, winningRule);
+    }
+
+    private IgnoreEvaluationResult EvaluateSinglePath(ReadOnlySpan<char> candidatePath, bool isDirectory)
+    {
+        IgnoreRule? winningRule = null;
+        var ignored = false;
+
+        foreach (var ruleSet in _ruleSets)
+        {
+            foreach (var rule in ruleSet.Rules)
+            {
+                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, DefaultComparison))
+                {
+                    continue;
+                }
+
                 winningRule = rule;
                 ignored = !rule.IsNegated;
             }

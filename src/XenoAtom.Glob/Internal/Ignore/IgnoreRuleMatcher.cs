@@ -9,8 +9,11 @@ namespace XenoAtom.Glob.Internal;
 internal static class IgnoreRuleMatcher
 {
     public static bool IsMatch(IgnoreRule rule, string candidatePath, int candidateLength, bool isDirectory, PathStringComparison comparison)
+        => IsMatch(rule, candidatePath.AsSpan(0, candidateLength), isDirectory, comparison);
+
+    public static bool IsMatch(IgnoreRule rule, ReadOnlySpan<char> candidatePath, bool isDirectory, PathStringComparison comparison)
     {
-        if (!TryGetRelativePathRange(rule.BaseDirectory, candidatePath, candidateLength, comparison, out var relativeStart, out var relativeLength))
+        if (!TryGetRelativePathRange(rule.BaseDirectory, candidatePath, comparison, out var relativeStart, out var relativeLength))
         {
             return false;
         }
@@ -20,7 +23,7 @@ internal static class IgnoreRuleMatcher
             return false;
         }
 
-        var relativePath = candidatePath.AsSpan(relativeStart, relativeLength);
+        var relativePath = candidatePath.Slice(relativeStart, relativeLength);
         if (rule.BasenameOnly)
         {
             var segmentStart = 0;
@@ -73,29 +76,29 @@ internal static class IgnoreRuleMatcher
         return false;
     }
 
-    private static bool TryGetRelativePathRange(string baseDirectory, string candidatePath, int candidateLength, PathStringComparison comparison, out int relativeStart, out int relativeLength)
+    private static bool TryGetRelativePathRange(string baseDirectory, ReadOnlySpan<char> candidatePath, PathStringComparison comparison, out int relativeStart, out int relativeLength)
     {
         if (baseDirectory.Length == 0)
         {
             relativeStart = 0;
-            relativeLength = candidateLength;
+            relativeLength = candidatePath.Length;
             return true;
         }
 
-        if (candidateLength == baseDirectory.Length &&
-            comparison.Equals(candidatePath.AsSpan(0, candidateLength), baseDirectory))
+        if (candidatePath.Length == baseDirectory.Length &&
+            comparison.Equals(candidatePath, baseDirectory))
         {
             relativeStart = 0;
             relativeLength = 0;
             return true;
         }
 
-        if (candidateLength > baseDirectory.Length &&
-            comparison.StartsWith(candidatePath.AsSpan(0, candidateLength), baseDirectory) &&
+        if (candidatePath.Length > baseDirectory.Length &&
+            comparison.StartsWith(candidatePath, baseDirectory) &&
             candidatePath[baseDirectory.Length] == '/')
         {
             relativeStart = baseDirectory.Length + 1;
-            relativeLength = candidateLength - relativeStart;
+            relativeLength = candidatePath.Length - relativeStart;
             return true;
         }
 
