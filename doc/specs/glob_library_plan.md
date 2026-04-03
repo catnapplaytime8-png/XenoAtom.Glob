@@ -326,17 +326,17 @@ This section is the quality backbone for the project and should be treated as ma
 ## 14. Suggested Commit Sequence
 
 - [ ] Commit 1: test harness and project cleanup
-- [ ] Commit 2: path model and normalization
-- [ ] Commit 3: core glob parser
-- [ ] Commit 4: core glob matcher
-- [ ] Commit 5: `.gitignore` parser
-- [ ] Commit 6: ignore evaluation engine
-- [ ] Commit 7: Git differential test suite
-- [ ] Commit 8: repository discovery
-- [ ] Commit 9: file tree walker
-- [ ] Commit 10: pruning and traversal diagnostics
-- [ ] Commit 11: performance tuning
-- [ ] Commit 12: docs and API polish
+- [x] Commit 2: path model and normalization
+- [x] Commit 3: core glob parser
+- [x] Commit 4: core glob matcher
+- [x] Commit 5: `.gitignore` parser
+- [x] Commit 6: ignore evaluation engine
+- [x] Commit 7: Git differential test suite
+- [x] Commit 8: repository discovery
+- [x] Commit 9: file tree walker
+- [x] Commit 10: pruning and traversal diagnostics
+- [x] Commit 11: performance tuning
+- [x] Commit 12: docs and API polish
 
 ## 15. Definition Of Done
 
