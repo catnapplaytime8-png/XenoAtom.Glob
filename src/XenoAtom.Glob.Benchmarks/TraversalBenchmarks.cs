@@ -84,7 +84,8 @@ public class TraversalBenchmarks
 
         var prunedRepository = _prunedFixture.InitializeGitRepository();
         _skippedFixture = new BenchmarkRepositoryFixture();
-        _skippedFixture.WriteAllText(".gitignore", """
+        var skippedRepository = _skippedFixture.InitializeGitRepository();
+        _skippedFixture.WriteAllText(".git/info/exclude", """
             skip*/
             *.tmp
             """);
@@ -94,7 +95,6 @@ public class TraversalBenchmarks
             _skippedFixture.WriteAllText($"entry{i}.tmp", string.Empty);
         }
 
-        var skippedRepository = _skippedFixture.InitializeGitRepository();
         _walker = new FileTreeWalker();
         _noIgnoreOptions = new FileTreeWalkOptions();
         _shallowIgnoreOptions = new FileTreeWalkOptions { RepositoryContext = repository };

@@ -13,9 +13,13 @@ namespace XenoAtom.Glob.Git;
 public sealed class RepositoryContext
 {
     private readonly object _cacheLock = new();
-    private CachedIgnoreFile? _globalExcludeCache;
-    private CachedIgnoreFile? _infoExcludeCache;
-    private readonly Dictionary<string, CachedIgnoreFile> _perDirectoryCache = new(StringComparer.Ordinal);
+    private int _ignoreStateVersion;
+    private bool _hasGlobalExcludeState;
+    private CachedIgnoreFileState _globalExcludeState;
+    private bool _hasInfoExcludeState;
+    private CachedIgnoreFileState _infoExcludeState;
+    private readonly Dictionary<string, CachedIgnoreFileState> _perDirectoryCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CachedIgnoreStack> _repositoryIgnoreStackCache = new(StringComparer.Ordinal);
 
     internal RepositoryContext(string workingTreeRoot, string gitDirectory, string? globalExcludePath, PathStringComparison pathComparison)
     {
@@ -47,6 +51,23 @@ public sealed class RepositoryContext
     /// </summary>
     public string InfoExcludePath => Path.Combine(GitDirectory, "info", "exclude");
 
+    internal IgnoreStack GetRepositoryIgnoreStack(string startRelativeDirectory)
+    {
+        var ruleSets = CreateInitialRuleSets(startRelativeDirectory);
+        lock (_cacheLock)
+        {
+            if (_repositoryIgnoreStackCache.TryGetValue(startRelativeDirectory, out var cachedStack) &&
+                cachedStack.Version == _ignoreStateVersion)
+            {
+                return cachedStack.Stack;
+            }
+
+            var stack = new IgnoreStack(ruleSets, PathComparison);
+            _repositoryIgnoreStackCache[startRelativeDirectory] = new CachedIgnoreStack(_ignoreStateVersion, stack);
+            return stack;
+        }
+    }
+
     internal IReadOnlyList<IgnoreRuleSet> CreateInitialRuleSets(string startRelativeDirectory)
     {
         var ruleSets = new List<IgnoreRuleSet>();
@@ -55,7 +76,8 @@ public sealed class RepositoryContext
                 GlobalExcludePath,
                 baseDirectory: string.Empty,
                 IgnoreRuleSourceKind.GlobalExclude,
-                ref _globalExcludeCache,
+                ref _hasGlobalExcludeState,
+                ref _globalExcludeState,
                 out var globalExcludeRuleSet))
         {
             ruleSets.Add(globalExcludeRuleSet);
@@ -65,7 +87,8 @@ public sealed class RepositoryContext
             InfoExcludePath,
             baseDirectory: string.Empty,
             IgnoreRuleSourceKind.RepositoryExclude,
-            ref _infoExcludeCache,
+            ref _hasInfoExcludeState,
+            ref _infoExcludeState,
             out var infoExcludeRuleSet))
         {
             ruleSets.Add(infoExcludeRuleSet);
@@ -117,35 +140,16 @@ public sealed class RepositoryContext
             ? Path.Combine(WorkingTreeRoot, ".gitignore")
             : Path.Combine(WorkingTreeRoot, relativeDirectory.Replace('/', Path.DirectorySeparatorChar), ".gitignore");
 
-        if (!TryGetIgnoreFileMetadata(gitIgnorePath, out var lastWriteTimeUtc, out var length))
+        if (!TryLoadIgnoreFile(
+            gitIgnorePath,
+            baseDirectory: relativeDirectory,
+            IgnoreRuleSourceKind.PerDirectory,
+            relativeDirectory,
+            out ruleSet))
         {
-            ruleSet = null!;
             return false;
         }
 
-        lock (_cacheLock)
-        {
-            if (_perDirectoryCache.TryGetValue(relativeDirectory, out var cachedRuleSet) &&
-                cachedRuleSet.LastWriteTimeUtc == lastWriteTimeUtc &&
-                cachedRuleSet.Length == length)
-            {
-                ruleSet = cachedRuleSet.RuleSet;
-                return true;
-            }
-        }
-
-        var parsedRuleSet = IgnoreRuleSet.ParseGitIgnore(
-            File.ReadAllText(gitIgnorePath),
-            baseDirectory: relativeDirectory,
-            sourcePath: gitIgnorePath,
-            sourceKind: IgnoreRuleSourceKind.PerDirectory);
-
-        lock (_cacheLock)
-        {
-            _perDirectoryCache[relativeDirectory] = new CachedIgnoreFile(lastWriteTimeUtc, length, parsedRuleSet);
-        }
-
-        ruleSet = parsedRuleSet;
         return true;
     }
 
@@ -153,24 +157,69 @@ public sealed class RepositoryContext
         string path,
         string baseDirectory,
         IgnoreRuleSourceKind sourceKind,
-        ref CachedIgnoreFile? cache,
+        ref bool hasState,
+        ref CachedIgnoreFileState state,
         out IgnoreRuleSet ruleSet)
     {
-        if (!TryGetIgnoreFileMetadata(path, out var lastWriteTimeUtc, out var length))
-        {
-            ruleSet = null!;
-            return false;
-        }
+        return TryLoadIgnoreFile(path, baseDirectory, sourceKind, key: null, ref hasState, ref state, out ruleSet);
+    }
 
+    private bool TryLoadIgnoreFile(
+        string path,
+        string baseDirectory,
+        IgnoreRuleSourceKind sourceKind,
+        string relativeDirectory,
+        out IgnoreRuleSet ruleSet)
+    {
+        CachedIgnoreFileState state;
+        var hasState = false;
         lock (_cacheLock)
         {
-            if (cache is CachedIgnoreFile cachedRuleSet &&
-                cachedRuleSet.LastWriteTimeUtc == lastWriteTimeUtc &&
-                cachedRuleSet.Length == length)
+            if (_perDirectoryCache.TryGetValue(relativeDirectory, out state))
             {
-                ruleSet = cachedRuleSet.RuleSet;
-                return true;
+                hasState = true;
             }
+        }
+
+        var found = TryLoadIgnoreFile(path, baseDirectory, sourceKind, relativeDirectory, ref hasState, ref state, out ruleSet);
+        lock (_cacheLock)
+        {
+            _perDirectoryCache[relativeDirectory] = state;
+        }
+
+        return found;
+    }
+
+    private bool TryLoadIgnoreFile(
+        string path,
+        string baseDirectory,
+        IgnoreRuleSourceKind sourceKind,
+        string? key,
+        ref bool hasState,
+        ref CachedIgnoreFileState state,
+        out IgnoreRuleSet ruleSet)
+    {
+        var exists = TryGetIgnoreFileMetadata(path, out var lastWriteTimeUtc, out var length);
+        lock (_cacheLock)
+        {
+            if (hasState &&
+                state.Exists == exists &&
+                (!exists || (state.LastWriteTimeUtc == lastWriteTimeUtc && state.Length == length)))
+            {
+                ruleSet = state.RuleSet!;
+                return exists;
+            }
+        }
+
+        if (!exists)
+        {
+            lock (_cacheLock)
+            {
+                UpdateCachedState(key, ref hasState, ref state, new CachedIgnoreFileState(false, default, 0, null));
+            }
+
+            ruleSet = null!;
+            return false;
         }
 
         var parsedRuleSet = IgnoreRuleSet.ParseGitIgnore(
@@ -181,7 +230,7 @@ public sealed class RepositoryContext
 
         lock (_cacheLock)
         {
-            cache = new CachedIgnoreFile(lastWriteTimeUtc, length, parsedRuleSet);
+            UpdateCachedState(key, ref hasState, ref state, new CachedIgnoreFileState(true, lastWriteTimeUtc, length, parsedRuleSet));
         }
 
         ruleSet = parsedRuleSet;
@@ -209,5 +258,24 @@ public sealed class RepositoryContext
         return (attributes & FileAttributes.ReparsePoint) != 0;
     }
 
-    private readonly record struct CachedIgnoreFile(DateTime LastWriteTimeUtc, long Length, IgnoreRuleSet RuleSet);
+    private void UpdateCachedState(string? key, ref bool hasState, ref CachedIgnoreFileState state, CachedIgnoreFileState newState)
+    {
+        if (hasState && state.Equals(newState))
+        {
+            return;
+        }
+
+        hasState = true;
+        state = newState;
+        if (key is not null)
+        {
+            _perDirectoryCache[key] = newState;
+        }
+
+        _ignoreStateVersion++;
+        _repositoryIgnoreStackCache.Clear();
+    }
+
+    private readonly record struct CachedIgnoreFileState(bool Exists, DateTime LastWriteTimeUtc, long Length, IgnoreRuleSet? RuleSet);
+    private readonly record struct CachedIgnoreStack(int Version, IgnoreStack Stack);
 }

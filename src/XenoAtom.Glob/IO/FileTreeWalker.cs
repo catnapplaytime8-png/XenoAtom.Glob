@@ -43,12 +43,16 @@ public sealed class FileTreeWalker
         if (repositoryContext is not null)
         {
             startRelativeDirectory = GetRelativeDirectory(repositoryContext.WorkingTreeRoot, fullRootPath, repositoryContext.PathComparison);
-            rootRuleSets = MergeRuleSets(
-                repositoryContext.CreateInitialRuleSets(startRelativeDirectory),
-                options.AdditionalRuleSets);
         }
 
-        var rootIgnoreStack = new IgnoreStack(rootRuleSets, repositoryContext?.PathComparison ?? PathStringComparison.CurrentPlatformDefault);
+        var rootIgnoreStack =
+            repositoryContext is not null && (options.AdditionalRuleSets is null || options.AdditionalRuleSets.Count == 0)
+                ? repositoryContext.GetRepositoryIgnoreStack(startRelativeDirectory)
+                : new IgnoreStack(
+                    repositoryContext is not null
+                        ? MergeRuleSets(repositoryContext.CreateInitialRuleSets(startRelativeDirectory), options.AdditionalRuleSets)
+                        : rootRuleSets,
+                    repositoryContext?.PathComparison ?? PathStringComparison.CurrentPlatformDefault);
         return EnumerateCore(fullRootPath, startRelativeDirectory, rootIgnoreStack, options, repositoryContext);
     }
 

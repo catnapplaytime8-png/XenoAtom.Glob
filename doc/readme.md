@@ -104,7 +104,7 @@ Traversal characteristics:
 - uses `FileSystemEnumerable<T>`
 - prunes ignored directories before descent
 - loads `.gitignore` lazily when entering directories
-- reuses cached parsed ignore files through `RepositoryContext` when file metadata is unchanged
+- reuses cached parsed ignore files and repository-root ignore state through `RepositoryContext` when file metadata is unchanged
 - does not follow reparse points or symbolic links by default
 - supports cancellation through `FileTreeWalkOptions.CancellationToken`
 

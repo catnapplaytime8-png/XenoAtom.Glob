@@ -427,6 +427,7 @@ The implementation should:
 - Pool temporary buffers.
 - Avoid allocating relative path strings for entries rejected before emission.
 - Cache parsed ignore files by full path and last-write metadata when such caching is enabled.
+- Allow reusable repository contexts to cache compiled repository-root ignore state when the observed ignore file metadata is unchanged.
 - Reuse traversal stack frames where practical.
 
 When a `RepositoryContext` is reused across traversals, the implementation should reuse parsed ignore files while their observed file metadata is unchanged, and it must invalidate those cached parses when the underlying ignore file changes.
