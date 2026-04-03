@@ -13,7 +13,6 @@ namespace XenoAtom.Glob.Git;
 public sealed class RepositoryContext
 {
     private readonly object _cacheLock = new();
-    private int _ignoreStateVersion;
     private bool _hasGlobalExcludeState;
     private CachedIgnoreFileState _globalExcludeState;
     private bool _hasInfoExcludeState;
@@ -53,22 +52,31 @@ public sealed class RepositoryContext
 
     internal IgnoreStack GetRepositoryIgnoreStack(string startRelativeDirectory)
     {
-        var ruleSets = CreateInitialRuleSets(startRelativeDirectory);
         lock (_cacheLock)
         {
             if (_repositoryIgnoreStackCache.TryGetValue(startRelativeDirectory, out var cachedStack) &&
-                cachedStack.Version == _ignoreStateVersion)
+                IsRepositoryIgnoreStackFresh(cachedStack))
             {
                 return cachedStack.Stack;
             }
-
-            var stack = new IgnoreStack(ruleSets, PathComparison);
-            _repositoryIgnoreStackCache[startRelativeDirectory] = new CachedIgnoreStack(_ignoreStateVersion, stack);
-            return stack;
         }
+
+        var dependencies = new List<CachedIgnoreStackDependency>();
+        var ruleSets = CreateInitialRuleSets(startRelativeDirectory, dependencies);
+        var stack = new IgnoreStack(ruleSets, PathComparison);
+
+        lock (_cacheLock)
+        {
+            _repositoryIgnoreStackCache[startRelativeDirectory] = new CachedIgnoreStack(stack, dependencies.ToArray());
+        }
+
+        return stack;
     }
 
     internal IReadOnlyList<IgnoreRuleSet> CreateInitialRuleSets(string startRelativeDirectory)
+        => CreateInitialRuleSets(startRelativeDirectory, dependencies: null);
+
+    private IReadOnlyList<IgnoreRuleSet> CreateInitialRuleSets(string startRelativeDirectory, List<CachedIgnoreStackDependency>? dependencies)
     {
         var ruleSets = new List<IgnoreRuleSet>();
         if (GlobalExcludePath is not null &&
@@ -76,6 +84,7 @@ public sealed class RepositoryContext
                 GlobalExcludePath,
                 baseDirectory: string.Empty,
                 IgnoreRuleSourceKind.GlobalExclude,
+                dependencies,
                 ref _hasGlobalExcludeState,
                 ref _globalExcludeState,
                 out var globalExcludeRuleSet))
@@ -87,6 +96,7 @@ public sealed class RepositoryContext
             InfoExcludePath,
             baseDirectory: string.Empty,
             IgnoreRuleSourceKind.RepositoryExclude,
+            dependencies,
             ref _hasInfoExcludeState,
             ref _infoExcludeState,
             out var infoExcludeRuleSet))
@@ -96,16 +106,16 @@ public sealed class RepositoryContext
 
         if (startRelativeDirectory.Length == 0)
         {
-            TryAddDirectoryRuleSet(ruleSets, string.Empty);
+            TryAddDirectoryRuleSet(ruleSets, string.Empty, dependencies);
             return ruleSets;
         }
 
-        TryAddDirectoryRuleSet(ruleSets, string.Empty);
+        TryAddDirectoryRuleSet(ruleSets, string.Empty, dependencies);
         var current = string.Empty;
         foreach (var segment in PathNormalizer.NormalizeRelativePath(startRelativeDirectory, isDirectory: true).EnumerateSegments())
         {
             current = current.Length == 0 ? segment.ToString() : $"{current}/{segment}";
-            TryAddDirectoryRuleSet(ruleSets, current);
+            TryAddDirectoryRuleSet(ruleSets, current, dependencies);
         }
 
         return ruleSets;
@@ -113,7 +123,7 @@ public sealed class RepositoryContext
 
     internal IReadOnlyList<IgnoreRuleSet> CreateChildRuleSets(IReadOnlyList<IgnoreRuleSet> currentRuleSets, string childRelativeDirectory)
     {
-        if (!TryLoadDirectoryRuleSet(childRelativeDirectory, out var ruleSet))
+        if (!TryLoadDirectoryRuleSet(childRelativeDirectory, dependencies: null, out var ruleSet))
         {
             return currentRuleSets;
         }
@@ -124,9 +134,9 @@ public sealed class RepositoryContext
         return ruleSets;
     }
 
-    private void TryAddDirectoryRuleSet(List<IgnoreRuleSet> ruleSets, string relativeDirectory)
+    private void TryAddDirectoryRuleSet(List<IgnoreRuleSet> ruleSets, string relativeDirectory, List<CachedIgnoreStackDependency>? dependencies)
     {
-        if (!TryLoadDirectoryRuleSet(relativeDirectory, out var ruleSet))
+        if (!TryLoadDirectoryRuleSet(relativeDirectory, dependencies, out var ruleSet))
         {
             return;
         }
@@ -134,7 +144,7 @@ public sealed class RepositoryContext
         ruleSets.Add(ruleSet);
     }
 
-    private bool TryLoadDirectoryRuleSet(string relativeDirectory, out IgnoreRuleSet ruleSet)
+    private bool TryLoadDirectoryRuleSet(string relativeDirectory, List<CachedIgnoreStackDependency>? dependencies, out IgnoreRuleSet ruleSet)
     {
         var gitIgnorePath = relativeDirectory.Length == 0
             ? Path.Combine(WorkingTreeRoot, ".gitignore")
@@ -144,6 +154,7 @@ public sealed class RepositoryContext
             gitIgnorePath,
             baseDirectory: relativeDirectory,
             IgnoreRuleSourceKind.PerDirectory,
+            dependencies,
             relativeDirectory,
             out ruleSet))
         {
@@ -157,17 +168,19 @@ public sealed class RepositoryContext
         string path,
         string baseDirectory,
         IgnoreRuleSourceKind sourceKind,
+        List<CachedIgnoreStackDependency>? dependencies,
         ref bool hasState,
         ref CachedIgnoreFileState state,
         out IgnoreRuleSet ruleSet)
     {
-        return TryLoadIgnoreFile(path, baseDirectory, sourceKind, key: null, ref hasState, ref state, out ruleSet);
+        return TryLoadIgnoreFile(path, baseDirectory, sourceKind, dependencies, key: null, ref hasState, ref state, out ruleSet);
     }
 
     private bool TryLoadIgnoreFile(
         string path,
         string baseDirectory,
         IgnoreRuleSourceKind sourceKind,
+        List<CachedIgnoreStackDependency>? dependencies,
         string relativeDirectory,
         out IgnoreRuleSet ruleSet)
     {
@@ -181,7 +194,7 @@ public sealed class RepositoryContext
             }
         }
 
-        var found = TryLoadIgnoreFile(path, baseDirectory, sourceKind, relativeDirectory, ref hasState, ref state, out ruleSet);
+        var found = TryLoadIgnoreFile(path, baseDirectory, sourceKind, dependencies, relativeDirectory, ref hasState, ref state, out ruleSet);
         lock (_cacheLock)
         {
             _perDirectoryCache[relativeDirectory] = state;
@@ -194,12 +207,14 @@ public sealed class RepositoryContext
         string path,
         string baseDirectory,
         IgnoreRuleSourceKind sourceKind,
+        List<CachedIgnoreStackDependency>? dependencies,
         string? key,
         ref bool hasState,
         ref CachedIgnoreFileState state,
         out IgnoreRuleSet ruleSet)
     {
         var exists = TryGetIgnoreFileMetadata(path, out var lastWriteTimeUtc, out var length);
+        dependencies?.Add(new CachedIgnoreStackDependency(path, exists, lastWriteTimeUtc, length));
         lock (_cacheLock)
         {
             if (hasState &&
@@ -271,11 +286,29 @@ public sealed class RepositoryContext
         {
             _perDirectoryCache[key] = newState;
         }
+    }
 
-        _ignoreStateVersion++;
-        _repositoryIgnoreStackCache.Clear();
+    private static bool IsRepositoryIgnoreStackFresh(CachedIgnoreStack cachedStack)
+    {
+        foreach (var dependency in cachedStack.Dependencies)
+        {
+            var exists = TryGetIgnoreFileMetadata(dependency.Path, out var lastWriteTimeUtc, out var length);
+            if (exists != dependency.Exists)
+            {
+                return false;
+            }
+
+            if (exists &&
+                (lastWriteTimeUtc != dependency.LastWriteTimeUtc || length != dependency.Length))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private readonly record struct CachedIgnoreFileState(bool Exists, DateTime LastWriteTimeUtc, long Length, IgnoreRuleSet? RuleSet);
-    private readonly record struct CachedIgnoreStack(int Version, IgnoreStack Stack);
+    private readonly record struct CachedIgnoreStackDependency(string Path, bool Exists, DateTime LastWriteTimeUtc, long Length);
+    private readonly record struct CachedIgnoreStack(IgnoreStack Stack, CachedIgnoreStackDependency[] Dependencies);
 }

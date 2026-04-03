@@ -215,6 +215,67 @@ public class FileTreeWalkerTests
     }
 
     [TestMethod]
+    public void Enumerate_ShouldInvalidateCachedIgnoreFilesWhenGitIgnoreAppears()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText("file.tmp", string.Empty);
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+
+        var firstPass = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { "file.tmp" }, firstPass);
+
+        tempDirectory.WriteAllText(".gitignore", "*.tmp\n");
+
+        var secondPass = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { ".gitignore" }, secondPass);
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldInvalidateCachedIgnoreFilesWhenRepositoryExcludeChanges()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText(".git/info/exclude", "file.tmp\n");
+        tempDirectory.WriteAllText("file.tmp", string.Empty);
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+
+        var firstPass = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(Array.Empty<string>(), firstPass);
+
+        tempDirectory.WriteAllText(".git/info/exclude", string.Empty);
+        var excludePath = tempDirectory.GetPath(".git/info/exclude");
+        File.SetLastWriteTimeUtc(excludePath, File.GetLastWriteTimeUtc(excludePath).AddSeconds(2));
+
+        var secondPass = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { "file.tmp" }, secondPass);
+    }
+
+    [TestMethod]
     public void Enumerate_ShouldHonorCancellation()
     {
         using var tempDirectory = new TemporaryDirectory();

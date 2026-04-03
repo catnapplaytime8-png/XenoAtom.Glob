@@ -36,17 +36,17 @@ Traversal pruning results:
 
 | Corpus size | Mean | Allocated |
 | --- | ---: | ---: |
-| `Small` | `799.42 us` | `41.33 KB` |
-| `Medium` | `3,081.3 us` | `164.83 KB` |
-| `Large` | `7,964.4 us` | `413.27 KB` |
+| `Small` | `827.85 us` | `40.80 KB` |
+| `Medium` | `3,075.4 us` | `164.30 KB` |
+| `Large` | `7,782.1 us` | `412.74 KB` |
 
 Traversal skipped-root results:
 
 | Corpus size | Mean | Allocated |
 | --- | ---: | ---: |
-| `Small` | `73.29 us` | `4.70 KB` |
-| `Medium` | `114.05 us` | `16.58 KB` |
-| `Large` | `187.74 us` | `40.02 KB` |
+| `Small` | `72.36 us` | `4.18 KB` |
+| `Medium` | `113.72 us` | `16.05 KB` |
+| `Large` | `181.12 us` | `39.49 KB` |
 
 Artifacts:
 
@@ -58,7 +58,7 @@ Notes:
 - The traversal benchmark now exercises size-scaled corpora, while the ignore benchmark records rule-count scaling across `1`, `10`, `100`, and `1000` effective rules.
 - The latest tuning removed hot-path segment splitting, prefix string construction, and unnecessary normalization copies for already-canonical relative paths.
 - The latest traversal tuning removed needless child rule-stack cloning when a directory has no local `.gitignore`, keeps relative ignore checks on a temporary span buffer before allocating emitted paths, and avoids materializing `FileName` strings for ignored entries.
-- Repository contexts now cache parsed ignore files by path plus file metadata, invalidate those cached parses when `.gitignore`, `.git/info/exclude`, or global exclude files change, and reuse the compiled repository-root ignore stack across repeated traversals when no additional rule sets are layered on top.
+- Repository contexts now cache parsed ignore files by path plus file metadata, invalidate those cached parses when `.gitignore`, `.git/info/exclude`, or global exclude files change, and reuse the compiled repository-root ignore stack across repeated traversals when its ignore-file dependency metadata is unchanged.
 - Relative to the first short-run snapshot, `GlobBenchmarks.EvaluateIgnoreDecision` improved from `131.87 ns` / `472 B` to `61.14 ns` / `104 B`.
 - A profiler-backed traversal trace over a dedicated harness showed the dominant remaining work in `FileTreeWalker` enumeration, directory `.gitignore` existence checks (`File.Exists`, `RepositoryContext.TryLoadDirectoryRuleSet`, `RepositoryContext.CreateChildRuleSets`), and underlying handle open/close calls rather than in per-entry ignore evaluation alone.
 - The skipped-entry benchmark now uses repository-scoped excludes from `.git/info/exclude` so the root directory can be measured without a visible working-tree `.gitignore` entry, and it improved materially again, but it still allocates non-trivial managed memory per traversal; the stricter skipped-entry allocation gate remains intentionally open.
