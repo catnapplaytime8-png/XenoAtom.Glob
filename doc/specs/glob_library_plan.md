@@ -150,49 +150,49 @@ Exit criteria:
 
 ## 8. Milestone 5: Git-Aware Repository Discovery
 
-- [ ] Implement discovery of a repository root from an arbitrary working-tree path.
-- [ ] Support both `.git` directories and `.git` gitfiles containing `gitdir: <path>`.
-- [ ] Resolve `.git/info/exclude` from discovered metadata.
-- [ ] Resolve the global exclude file from Git configuration or from an explicitly supplied resolved path, depending on the chosen API decision.
-- [ ] Make repository discovery explicit and reusable rather than burying it inside traversal.
+- [x] Implement discovery of a repository root from an arbitrary working-tree path.
+- [x] Support both `.git` directories and `.git` gitfiles containing `gitdir: <path>`.
+- [x] Resolve `.git/info/exclude` from discovered metadata.
+- [x] Resolve the global exclude file from Git configuration or from an explicitly supplied resolved path, depending on the chosen API decision.
+- [x] Make repository discovery explicit and reusable rather than burying it inside traversal.
 - [ ] Document any intentionally deferred repository behaviors.
 
 Tests:
 
-- [ ] Unit tests for repository discovery when `.git` is a directory.
-- [ ] Unit tests for repository discovery when `.git` is a gitfile with a relative path.
-- [ ] Unit tests for worktree-like metadata layouts.
+- [x] Unit tests for repository discovery when `.git` is a directory.
+- [x] Unit tests for repository discovery when `.git` is a gitfile with a relative path.
+- [x] Unit tests for worktree-like metadata layouts.
 - [ ] Unit tests for submodule-like gitfile layouts.
 - [ ] Unit tests for missing or malformed gitfile content.
-- [ ] Differential tests proving the discovered root, git dir, and ignore sources match what Git reports for the same temporary repository.
-- [ ] Validate repository discovery against `git rev-parse --show-toplevel` and `git rev-parse --git-dir`.
+- [x] Differential tests proving the discovered root, git dir, and ignore sources match what Git reports for the same temporary repository.
+- [x] Validate repository discovery against `git rev-parse --show-toplevel` and `git rev-parse --git-dir`.
 
 Exit criteria:
 
-- [ ] Repository discovery is correct for normal repositories, linked worktrees, and gitfile-backed working trees in the supported scenarios.
+- [x] Repository discovery is correct for normal repositories, linked worktrees, and gitfile-backed working trees in the supported scenarios.
 
 ## 9. Milestone 6: File Tree Walker And Traversal Pruning
 
-- [ ] Implement traversal around `FileSystemEnumerable<T>` or the chosen equivalent.
-- [ ] Design `FileTreeEntry` so it exposes enough metadata without forcing expensive object creation.
-- [ ] Evaluate ignore rules before descending into directories.
-- [ ] Load per-directory `.gitignore` lazily when entering a directory.
-- [ ] Implement pruning of excluded directories.
-- [ ] Keep non-following symlink or reparse-point behavior as the default Git-compatible mode.
+- [x] Implement traversal around `FileSystemEnumerable<T>` or the chosen equivalent.
+- [x] Design `FileTreeEntry` so it exposes enough metadata without forcing expensive object creation.
+- [x] Evaluate ignore rules before descending into directories.
+- [x] Load per-directory `.gitignore` lazily when entering a directory.
+- [x] Implement pruning of excluded directories.
+- [x] Keep non-following symlink or reparse-point behavior as the default Git-compatible mode.
 - [ ] Add cancellation support to long-running walks.
 - [ ] Decide and document whether ordering is unspecified or optionally configurable.
 
 Tests:
 
-- [ ] Unit tests for flat directory enumeration with no ignore rules.
-- [ ] Unit tests for nested traversal with parent and child `.gitignore` files.
-- [ ] Unit tests proving excluded directories are pruned and not descended into.
+- [x] Unit tests for flat directory enumeration with no ignore rules.
+- [x] Unit tests for nested traversal with parent and child `.gitignore` files.
+- [x] Unit tests proving excluded directories are pruned and not descended into.
 - [ ] Unit tests proving reachable directories can still re-include children when allowed.
-- [ ] Unit tests for `.gitignore` loading only from directories actually entered.
+- [x] Unit tests for `.gitignore` loading only from directories actually entered.
 - [ ] Unit tests for symlink or reparse-point handling where supported by the platform.
-- [ ] Integration tests over realistic directory trees with mixed files, directories, and ignore rules.
-- [ ] Differential traversal tests that compare the resulting visible path set to a Git-derived expected set in supported scenarios.
-- [ ] Differential traversal tests that also compare per-entry ignore decisions against `git check-ignore` for the same fixture paths.
+- [x] Integration tests over realistic directory trees with mixed files, directories, and ignore rules.
+- [x] Differential traversal tests that compare the resulting visible path set to a Git-derived expected set in supported scenarios.
+- [x] Differential traversal tests that also compare per-entry ignore decisions against `git check-ignore` for the same fixture paths.
 
 Performance tests:
 
@@ -203,8 +203,8 @@ Performance tests:
 
 Exit criteria:
 
-- [ ] Traversal is correct, lazy, and prunes excluded directories before descent.
-- [ ] The walk API is usable independently of the Git-specific layer.
+- [x] Traversal is correct, lazy, and prunes excluded directories before descent.
+- [x] The walk API is usable independently of the Git-specific layer.
 
 ## 10. Milestone 7: Performance Tuning And Benchmark Hardening
 

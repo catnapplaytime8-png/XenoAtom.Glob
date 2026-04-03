@@ -1,0 +1,113 @@
+// Copyright (c) Alexandre Mutel. All rights reserved.
+// Licensed under the BSD-Clause 2 license.
+// See license.txt file in the project root for full license information.
+
+namespace XenoAtom.Glob.Internal;
+
+internal static class GitConfigReader
+{
+    public static string? ResolveGlobalExcludePath(string gitDirectory)
+    {
+        foreach (var configPath in EnumerateCandidateConfigPaths(gitDirectory))
+        {
+            if (!File.Exists(configPath))
+            {
+                continue;
+            }
+
+            var value = TryReadCoreExcludesFile(configPath);
+            if (value is null)
+            {
+                continue;
+            }
+
+            return ExpandAndResolvePath(value, Path.GetDirectoryName(configPath)!);
+        }
+
+        var xdgConfigHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        if (!string.IsNullOrWhiteSpace(xdgConfigHome))
+        {
+            return Path.Combine(ExpandHome(xdgConfigHome), "git", "ignore");
+        }
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return string.IsNullOrEmpty(home) ? null : Path.Combine(home, ".config", "git", "ignore");
+    }
+
+    private static IEnumerable<string> EnumerateCandidateConfigPaths(string gitDirectory)
+    {
+        yield return Path.Combine(gitDirectory, "config");
+
+        var xdgConfigHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        if (!string.IsNullOrWhiteSpace(xdgConfigHome))
+        {
+            yield return Path.Combine(ExpandHome(xdgConfigHome), "git", "config");
+        }
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(home))
+        {
+            yield return Path.Combine(home, ".gitconfig");
+            yield return Path.Combine(home, ".config", "git", "config");
+        }
+    }
+
+    private static string? TryReadCoreExcludesFile(string configPath)
+    {
+        string? currentSection = null;
+        foreach (var rawLine in File.ReadLines(configPath))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || line.StartsWith('#') || line.StartsWith(';'))
+            {
+                continue;
+            }
+
+            if (line.StartsWith('[') && line.EndsWith(']'))
+            {
+                currentSection = line[1..^1].Trim();
+                continue;
+            }
+
+            if (!string.Equals(currentSection, "core", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var separatorIndex = line.IndexOf('=');
+            if (separatorIndex < 0)
+            {
+                continue;
+            }
+
+            var key = line[..separatorIndex].Trim();
+            if (!string.Equals(key, "excludesFile", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return line[(separatorIndex + 1)..].Trim();
+        }
+
+        return null;
+    }
+
+    private static string ExpandAndResolvePath(string path, string baseDirectory)
+    {
+        var expanded = ExpandHome(path);
+        return Path.IsPathRooted(expanded)
+            ? Path.GetFullPath(expanded)
+            : Path.GetFullPath(Path.Combine(baseDirectory, expanded));
+    }
+
+    private static string ExpandHome(string path)
+    {
+        if (!path.StartsWith("~/", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return string.IsNullOrEmpty(home) ? path : Path.Combine(home, path[2..].Replace('/', Path.DirectorySeparatorChar));
+    }
+}
