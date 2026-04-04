@@ -51,20 +51,20 @@ The actionable conclusion is now broader and better evidenced:
 
 | Area | Benchmark | Mean | Allocated |
 | --- | --- | ---: | ---: |
-| path | `NormalizeAlreadyNormalizedPath` | `20.49 ns` | `0 B` |
-| path | `NormalizeWindowsStylePath` | `40.08 ns` | `80 B` |
-| path | `NormalizeUnixStylePath` | `50.01 ns` | `80 B` |
-| glob | `ParseRecursivePattern` | `242.56 ns` | `1.91 KB` |
-| glob | `MatchLiteralPath` | `24.47 ns` | `0 B` |
-| glob | `MatchLiteralPathFailure` | `23.86 ns` | `0 B` |
-| glob | `MatchLiteralPathPreNormalizedCore` | `7.20 ns` | `0 B` |
-| glob | `MatchLiteralPathWithNormalizationRequired` | `34.70 ns` | `56 B` |
-| glob | `MatchRecursivePath` | `70.00 ns` | `0 B` |
-| glob | `MatchRecursivePathFailure` | `72.46 ns` | `0 B` |
-| glob | `MatchCharClassPath` | `43.31 ns` | `0 B` |
-| glob | `MatchCharClassPathFailure` | `39.15 ns` | `0 B` |
-| ignore | `GlobBenchmarks.EvaluateIgnoreDecision` | `42.51 ns` | `32 B` |
-| ignore | `GlobBenchmarks.EvaluateIgnoreDecisionPreNormalizedCore` | `27.28 ns` | `32 B` |
+| path | `NormalizeAlreadyNormalizedPath` | `30.72 ns` | `0 B` |
+| path | `NormalizeWindowsStylePath` | `53.22 ns` | `80 B` |
+| path | `NormalizeUnixStylePath` | `62.71 ns` | `80 B` |
+| glob | `ParseRecursivePattern` | `249.01 ns` | `1.91 KB` |
+| glob | `MatchLiteralPath` | `24.09 ns` | `0 B` |
+| glob | `MatchLiteralPathFailure` | `23.10 ns` | `0 B` |
+| glob | `MatchLiteralPathPreNormalizedCore` | `4.22 ns` | `0 B` |
+| glob | `MatchLiteralPathWithNormalizationRequired` | `39.56 ns` | `56 B` |
+| glob | `MatchRecursivePath` | `76.25 ns` | `0 B` |
+| glob | `MatchRecursivePathFailure` | `81.80 ns` | `0 B` |
+| glob | `MatchCharClassPath` | `46.68 ns` | `0 B` |
+| glob | `MatchCharClassPathFailure` | `42.40 ns` | `0 B` |
+| ignore | `GlobBenchmarks.EvaluateIgnoreDecision` | `60.22 ns` | `32 B` |
+| ignore | `GlobBenchmarks.EvaluateIgnoreDecisionPreNormalizedCore` | `36.34 ns` | `32 B` |
 
 ## Public Span API Results
 
@@ -72,10 +72,10 @@ These targeted release benchmarks exercise the public `ReadOnlySpan<char>` entry
 
 | Benchmark | Mean | Allocated |
 | --- | ---: | ---: |
-| `MatchLiteralPathWithNormalizationRequiredString` | `40.88 ns` | `56 B` |
-| `MatchLiteralPathWithNormalizationRequiredSpan` | `27.89 ns` | `0 B` |
-| `EvaluateIgnoreDecisionWithNormalizationRequiredString` | `81.29 ns` | `96 B` |
-| `EvaluateIgnoreDecisionWithNormalizationRequiredSpan` | `49.38 ns` | `0 B` |
+| `MatchLiteralPathWithNormalizationRequiredString` | `39.13 ns` | `56 B` |
+| `MatchLiteralPathWithNormalizationRequiredSpan` | `28.94 ns` | `0 B` |
+| `EvaluateIgnoreDecisionWithNormalizationRequiredString` | `77.28 ns` | `96 B` |
+| `EvaluateIgnoreDecisionWithNormalizationRequiredSpan` | `51.56 ns` | `0 B` |
 
 ## Ignore Scaling
 
@@ -90,10 +90,10 @@ Selected public-entry-point results:
 
 | Scenario | 1 rule | 10 rules | 100 rules | 1000 rules |
 | --- | ---: | ---: | ---: | ---: |
-| `BasenameHit` | `100.99 ns` | `1.68 us` | `18.09 us` | `173.09 us` |
-| `BasenameMiss` | `106.15 ns` | `1.70 us` | `17.82 us` | `177.25 us` |
-| `DeepHit` | `980.11 ns` | `5.05 us` | `46.30 us` | `454.59 us` |
-| `DeepMiss` | `1.01 us` | `5.94 us` | `47.05 us` | `519.39 us` |
+| `BasenameHit` | `80.98 ns` | `1.77 us` | `18.72 us` | `174.20 us` |
+| `BasenameMiss` | `83.44 ns` | `1.78 us` | `18.80 us` | `173.14 us` |
+| `DeepHit` | `1.11 us` | `5.92 us` | `47.33 us` | `464.05 us` |
+| `DeepMiss` | `1.12 us` | `5.26 us` | `47.04 us` | `459.95 us` |
 
 The baseline deep-rule matrix still scales with rule count because those scenarios are intentionally dominated by non-indexable full-path patterns.
 
@@ -101,10 +101,10 @@ The new index-focused release reruns show the intended large-rule-set win for si
 
 | Scenario | 1000 rules |
 | --- | ---: |
-| `IndexedExactHit` | `165.69 ns` |
-| `IndexedExactMiss` | `150.17 ns` |
-| `IndexedExtensionHit` | `108.87 ns` |
-| `IndexedExtensionMiss` | `89.16 ns` |
+| `IndexedExactHit` | `168.58 ns` |
+| `IndexedExactMiss` | `150.86 ns` |
+| `IndexedExtensionHit` | `107.62 ns` |
+| `IndexedExtensionMiss` | `90.75 ns` |
 
 Those indexed scenarios stay allocation-free and avoid the `173 us` to `519 us` scaling behavior seen in the deep fallback-heavy matrix.
 
@@ -114,9 +114,9 @@ The parser benchmarks now cover both glob compilation and full ignore-file parsi
 
 | Benchmark | Mean | Allocated |
 | --- | ---: | ---: |
-| `ParseRecursivePattern` | `242.56 ns` | `1.91 KB` |
-| `ParseGitIgnoreString` | `32.78 us` | `228.85 KB` |
-| `ParseGitIgnoreSpan` | `34.42 us` | `228.85 KB` |
+| `ParseRecursivePattern` | `243.10 ns` | `1.91 KB` |
+| `ParseGitIgnoreString` | `32.89 us` | `228.85 KB` |
+| `ParseGitIgnoreSpan` | `32.64 us` | `228.85 KB` |
 
 The glob-parser cleanup reduced the transient allocation footprint of recursive pattern compilation. The ignore-file span entry point removes the initial full-content copy and per-line string splitting, but the total benchmark allocation is still dominated by the retained `IgnoreRule`, token, and pattern object graph that both public parse paths must build.
 
@@ -126,15 +126,15 @@ The misleading one-level raw baseline was removed. The no-ignore comparison is n
 
 | Corpus | Raw Recursive No Ignore | `EnumerateWithoutIgnoreRules` | `EnumerateWithPrunedDirectories` | `EnumerateWhereAllRootEntriesAreSkipped` |
 | --- | ---: | ---: | ---: | ---: |
-| `Small` | `670.70 us` | `717.19 us` | `741.07 us` | `69.90 us` |
-| `Medium` | `1.78 ms` | `1.94 ms` | `2.76 ms` | `98.18 us` |
-| `Large` | `3.30 ms` | `3.72 ms` | `6.93 ms` | `150.79 us` |
+| `Small` | `746.99 us` | `791.52 us` | `840.53 us` | `76.42 us` |
+| `Medium` | `1.97 ms` | `2.14 ms` | `3.14 ms` | `106.84 us` |
+| `Large` | `3.61 ms` | `4.03 ms` | `7.60 ms` | `161.90 us` |
 
 For the same recursive no-ignore traversal shape, the library overhead versus a raw recursive `FileSystemEnumerator<T>` baseline is roughly:
 
-- `+6.9%` on the small corpus
-- `+8.7%` on the medium corpus
-- `+12.8%` on the large corpus
+- `+6.0%` on the small corpus
+- `+8.5%` on the medium corpus
+- `+11.6%` on the large corpus
 
 ## Current Repository
 
@@ -142,7 +142,7 @@ Release run over this repository:
 
 | Benchmark | Mean | Allocated |
 | --- | ---: | ---: |
-| `EnumerateCurrentRepositoryWithGitIgnore` | `4.686 ms` | `52.42 KB` |
-| `EnumerateCurrentRepositoryWithLibGit2SharpIgnoreChecks` | `8.350 ms` | `74.50 KB` |
+| `EnumerateCurrentRepositoryWithGitIgnore` | `2.460 ms` | `53.72 KB` |
+| `EnumerateCurrentRepositoryWithLibGit2SharpIgnoreChecks` | `8.518 ms` | `76.44 KB` |
 
-On this machine and repository snapshot, the repository-aware traversal benchmark is about `1.79x` faster than the LibGit2Sharp comparison and allocates about `1.42x` less memory.
+On this machine and repository snapshot, the repository-aware traversal benchmark is about `3.46x` faster than the LibGit2Sharp comparison and allocates about `1.42x` less memory.
