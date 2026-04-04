@@ -103,6 +103,15 @@ public class GlobPatternTests
     }
 
     [TestMethod]
+    public void IsMatch_ShouldSupportReadOnlySpanOverload()
+    {
+        var pattern = GlobPattern.Parse("src/**/file.txt");
+        ReadOnlySpan<char> candidate = @"src\nested\file.txt";
+
+        Assert.IsTrue(pattern.IsMatch(candidate));
+    }
+
+    [TestMethod]
     public void TryParse_ShouldRejectLeadingSeparator()
     {
         var result = GlobPattern.TryParse("/file.txt");

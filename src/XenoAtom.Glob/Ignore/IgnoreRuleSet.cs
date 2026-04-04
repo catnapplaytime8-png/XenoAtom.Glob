@@ -32,7 +32,7 @@ public sealed class IgnoreRuleSet
         string? sourcePath = null,
         IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
     {
-        return Parse(content.ToString(), IgnoreDialect.GitIgnore, baseDirectory, sourcePath, sourceKind);
+        return Parse(content, IgnoreDialect.GitIgnore, baseDirectory, sourcePath, sourceKind);
     }
 
     /// <summary>
@@ -82,7 +82,18 @@ public sealed class IgnoreRuleSet
         string? sourcePath = null,
         IgnoreRuleSourceKind sourceKind = IgnoreRuleSourceKind.PerDirectory)
     {
-        return Parse(content.ToString(), dialect, baseDirectory, sourcePath, sourceKind);
+        var normalizedBaseDirectory = string.IsNullOrEmpty(baseDirectory)
+            ? string.Empty
+            : PathNormalizer.NormalizeRelativePath(baseDirectory!, isDirectory: true).Value;
+
+        var rules = dialect switch
+        {
+            IgnoreDialect.GitIgnore => GitIgnoreParser.Parse(content, normalizedBaseDirectory, sourcePath, sourceKind),
+            IgnoreDialect.IgnoreFile => GitIgnoreParser.Parse(content, normalizedBaseDirectory, sourcePath, sourceKind),
+            _ => throw new ArgumentOutOfRangeException(nameof(dialect)),
+        };
+
+        return new IgnoreRuleSet(rules);
     }
 
     /// <summary>

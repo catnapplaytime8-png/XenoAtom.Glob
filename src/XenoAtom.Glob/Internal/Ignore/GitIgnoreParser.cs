@@ -16,25 +16,47 @@ internal static class GitIgnoreParser
         string? sourcePath,
         IgnoreRuleSourceKind sourceKind)
     {
+        ArgumentNullException.ThrowIfNull(content);
+        return Parse(content.AsSpan(), baseDirectory, sourcePath, sourceKind);
+    }
+
+    public static IReadOnlyList<IgnoreRule> Parse(
+        ReadOnlySpan<char> content,
+        string baseDirectory,
+        string? sourcePath,
+        IgnoreRuleSourceKind sourceKind)
+    {
         var rules = new List<IgnoreRule>();
-        using var reader = new StringReader(content);
-        string? line;
         var lineNumber = 0;
-        while ((line = reader.ReadLine()) is not null)
+        var lineStart = 0;
+        for (var index = 0; index <= content.Length; index++)
         {
+            if (index < content.Length && content[index] != '\n')
+            {
+                continue;
+            }
+
+            var line = content[lineStart..index];
+            if (line.Length > 0 && line[^1] == '\r')
+            {
+                line = line[..^1];
+            }
+
             lineNumber++;
             var rule = ParseLine(line, baseDirectory, sourcePath, sourceKind, lineNumber);
             if (rule is not null)
             {
                 rules.Add(rule);
             }
+
+            lineStart = index + 1;
         }
 
         return rules;
     }
 
     private static IgnoreRule? ParseLine(
-        string line,
+        ReadOnlySpan<char> line,
         string baseDirectory,
         string? sourcePath,
         IgnoreRuleSourceKind sourceKind,
@@ -82,7 +104,7 @@ internal static class GitIgnoreParser
         }
 
         var basenameOnly = !ContainsUnescapedSlash(patternText);
-        var parseResult = GlobParser.TryParse(patternText, GlobParserOptions.IgnorePattern);
+        var parseResult = GlobParser.TryParse(patternText.ToString(), GlobParserOptions.IgnorePattern);
         if (!parseResult.Success)
         {
             throw new ArgumentException(
@@ -91,8 +113,8 @@ internal static class GitIgnoreParser
         }
 
         return new IgnoreRule(
-            patternText,
-            trimmedLine,
+            patternText.ToString(),
+            trimmedLine.ToString(),
             isNegated,
             directoryOnly,
             basenameOnly,
@@ -103,7 +125,7 @@ internal static class GitIgnoreParser
             parseResult.Pattern);
     }
 
-    private static string TrimUnescapedTrailingSpaces(string line)
+    private static ReadOnlySpan<char> TrimUnescapedTrailingSpaces(ReadOnlySpan<char> line)
     {
         var end = line.Length;
         while (end > 0 && line[end - 1] == ' ' && !IsEscaped(line, end - 1))
@@ -114,9 +136,9 @@ internal static class GitIgnoreParser
         return line[..end];
     }
 
-    private static bool HasUnescapedTrailingSlash(string text) => text.Length > 0 && text[^1] == '/' && !IsEscaped(text, text.Length - 1);
+    private static bool HasUnescapedTrailingSlash(ReadOnlySpan<char> text) => text.Length > 0 && text[^1] == '/' && !IsEscaped(text, text.Length - 1);
 
-    private static bool ContainsUnescapedSlash(string text)
+    private static bool ContainsUnescapedSlash(ReadOnlySpan<char> text)
     {
         for (var index = 0; index < text.Length; index++)
         {
@@ -129,7 +151,7 @@ internal static class GitIgnoreParser
         return false;
     }
 
-    private static bool IsEscaped(string text, int index)
+    private static bool IsEscaped(ReadOnlySpan<char> text, int index)
     {
         var slashCount = 0;
         for (var i = index - 1; i >= 0 && text[i] == '\\'; i--)

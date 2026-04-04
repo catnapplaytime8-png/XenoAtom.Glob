@@ -2,6 +2,8 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using System.Buffers;
+
 using XenoAtom.Glob.Internal;
 
 namespace XenoAtom.Glob.Ignore;
@@ -13,6 +15,7 @@ public sealed class IgnoreMatcher
 {
     private const int IndexThreshold = 32;
     private const int MinimumIndexedRuleCount = 16;
+    private const int NormalizationStackallocThreshold = 256;
 
     private readonly IndexedRuleSet[] _indexedRuleSets;
     private readonly PathStringComparison _comparison;
@@ -57,6 +60,52 @@ public sealed class IgnoreMatcher
         var normalizedPath = PathNormalizer.NormalizeRelativePath(path, isDirectory);
         return Evaluate(normalizedPath);
     }
+
+    /// <summary>
+    /// Evaluates ignore rules for the specified relative path span.
+    /// </summary>
+    /// <param name="path">The relative path to evaluate.</param>
+    /// <param name="isDirectory">A value indicating whether the path is a directory.</param>
+    /// <returns>The ignore evaluation result.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="path"/> is not a supported relative path.</exception>
+    public IgnoreEvaluationResult Evaluate(ReadOnlySpan<char> path, bool isDirectory = false)
+    {
+        char[]? rentedBuffer = null;
+        var destination = path.Length <= NormalizationStackallocThreshold
+            ? stackalloc char[path.Length]
+            : (rentedBuffer = ArrayPool<char>.Shared.Rent(path.Length));
+
+        try
+        {
+            if (!PathNormalizer.TryNormalizeRelativePath(
+                path,
+                isDirectory,
+                destination,
+                out var normalizedPath,
+                out var normalizedIsDirectory,
+                out var _,
+                out var error))
+            {
+                throw new ArgumentException(GetPathErrorMessage(error), nameof(path));
+            }
+
+            return EvaluateNormalized(normalizedPath, normalizedIsDirectory);
+        }
+        finally
+        {
+            if (rentedBuffer is not null)
+            {
+                ArrayPool<char>.Shared.Return(rentedBuffer);
+            }
+        }
+    }
+
+    private static string GetPathErrorMessage(PathNormalizationError error) => error switch
+    {
+        PathNormalizationError.AbsolutePathNotSupported => "Only relative paths are supported.",
+        PathNormalizationError.ParentDirectorySegmentsNotSupported => "Parent directory segments ('..') are not supported.",
+        _ => "The path could not be normalized.",
+    };
 
     internal IgnoreEvaluationResult EvaluateNormalized(ReadOnlySpan<char> normalizedPath, bool isDirectory)
     {
