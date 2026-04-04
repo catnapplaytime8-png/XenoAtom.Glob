@@ -168,6 +168,49 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void ParseGitIgnore_ShouldTreatEscapedHashAsLiteral()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("\\#literal.txt\n"));
+
+        var ignored = matcher.Evaluate("#literal.txt");
+        var other = matcher.Evaluate("literal.txt");
+
+        Assert.IsTrue(ignored.IsIgnored);
+        Assert.IsFalse(other.IsMatch);
+        Assert.AreEqual("\\#literal.txt", ignored.Rule!.PatternText);
+        Assert.AreEqual("\\#literal.txt", ignored.Rule.RawPatternText);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldAnchorLeadingSlashPatternsToRuleBaseDirectory()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("/hello.*\n"));
+
+        var rootMatch = matcher.Evaluate("hello.txt");
+        var nestedMatch = matcher.Evaluate("a/hello.java");
+
+        Assert.IsTrue(rootMatch.IsIgnored);
+        Assert.IsFalse(nestedMatch.IsMatch);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldTreatLeadingSlashAsRedundantWhenPatternHasMiddleSlash()
+    {
+        var matcherWithoutLeadingSlash = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("doc/frotz\n"));
+        var matcherWithLeadingSlash = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("/doc/frotz\n"));
+        var paths = new[] { "doc/frotz", "a/doc/frotz" };
+
+        foreach (var path in paths)
+        {
+            var withoutLeadingSlash = matcherWithoutLeadingSlash.Evaluate(path);
+            var withLeadingSlash = matcherWithLeadingSlash.Evaluate(path);
+
+            Assert.AreEqual(withoutLeadingSlash.IsMatch, withLeadingSlash.IsMatch, $"Mismatch for path '{path}'.");
+            Assert.AreEqual(withoutLeadingSlash.IsIgnored, withLeadingSlash.IsIgnored, $"Mismatch for path '{path}'.");
+        }
+    }
+
+    [TestMethod]
     public void ParseGitIgnore_ShouldSupportStreamAndReaderOverloads()
     {
         using var stream = new MemoryStream("*.tmp\n"u8.ToArray());

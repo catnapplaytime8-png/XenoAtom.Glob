@@ -101,7 +101,7 @@ internal static class GitIgnoreParser
             patternText = patternText[1..];
         }
 
-        var basenameOnly = !ContainsUnescapedSlash(patternText);
+        var basenameOnly = !leadingSlash && !ContainsUnescapedSlash(patternText);
         var parseResult = GlobParser.TryParse(patternText, GlobParserOptions.IgnorePattern);
         if (!parseResult.Success)
         {

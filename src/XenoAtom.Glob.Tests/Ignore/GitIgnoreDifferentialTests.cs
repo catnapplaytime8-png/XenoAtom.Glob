@@ -142,6 +142,129 @@ public class GitIgnoreDifferentialTests
     }
 
     [TestMethod]
+    public void GitDifferential_ShouldMatchGitignoreDocumentationPatternExamples()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText(".gitignore", """
+            \#literal.txt
+            /hello.*
+            doc/frotz
+            foo/*
+            **/foo
+            abc/**
+            a/**/b
+            """);
+
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+            sourcePath: ".gitignore"));
+        var paths = new[]
+        {
+            "#literal.txt",
+            "hello.txt",
+            "a/hello.java",
+            "doc/frotz",
+            "a/doc/frotz",
+            "foo/test.json",
+            "foo/bar",
+            "foo/bar/hello.c",
+            "foo",
+            "nested/foo",
+            "abc/file.txt",
+            "abc/nested/file.txt",
+            "other/abc/file.txt",
+            "a/b",
+            "a/x/b",
+            "a/x/y/b",
+            "a/x/y/c",
+        };
+        var gitResults = QueryGit(git, paths);
+
+        foreach (var path in paths)
+        {
+            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, "gitignore-documentation-pattern-examples");
+        }
+    }
+
+    [TestMethod]
+    public void GitDifferential_ShouldNotFollowSymlinkedGitIgnoreFiles_WhenSupported()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText("rules.txt", "*.tmp\n");
+        tempDirectory.WriteAllText("file.tmp", string.Empty);
+
+        try
+        {
+            File.CreateSymbolicLink(tempDirectory.GetPath(".gitignore"), "rules.txt");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+        {
+            Assert.Inconclusive($"Symbolic links are not supported in this environment: {ex.Message}");
+        }
+
+        var context = XenoAtom.Glob.Git.RepositoryDiscovery.Discover(tempDirectory.Path);
+        var matcher = context.GetRepositoryIgnoreStack(string.Empty).Matcher;
+        var gitQuery = git.RunWithInput("file.tmp\0", "check-ignore", "--no-index", "--stdin", "-z", "-v", "--non-matching");
+        if (gitQuery.ExitCode != 0)
+        {
+            Assert.Inconclusive($"Git could not evaluate a symlinked .gitignore on this platform: {gitQuery.StandardError.Trim()}");
+        }
+
+        var gitResult = QueryGit(git, ["file.tmp"])["file.tmp"];
+
+        GitCompatibilityAssert.Matches("file.tmp", false, git, gitResult, matcher, "symlinked-gitignore-file");
+    }
+
+    [TestMethod]
+    public void GitDifferential_ShouldMatchDocumentationExcludeEverythingExceptDirectoryExample()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText(".gitignore", """
+            /*
+            !/foo
+            /foo/*
+            !/foo/bar
+            """);
+        tempDirectory.CreateDirectory("foo", "bar");
+        tempDirectory.WriteAllText("foo/file.txt", string.Empty);
+        tempDirectory.WriteAllText("foo/bar/keep.txt", string.Empty);
+        tempDirectory.WriteAllText("root.txt", string.Empty);
+
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+            sourcePath: ".gitignore"));
+        var entries = new (string Path, bool IsDirectory)[]
+        {
+            ("root.txt", false),
+            ("foo", true),
+            ("foo/file.txt", false),
+            ("foo/bar", true),
+            ("foo/bar/keep.txt", false),
+        };
+        var gitResults = QueryGit(git, entries.Select(static entry => entry.Path).ToArray());
+
+        foreach (var entry in entries)
+        {
+            GitCompatibilityAssert.Matches(
+                entry.Path,
+                entry.IsDirectory,
+                git,
+                gitResults[entry.Path],
+                matcher,
+                "gitignore-documentation-exclude-everything-except-directory");
+        }
+    }
+
+    [TestMethod]
     public void GitDifferential_ShouldMatchCorpusFixtures()
     {
         foreach (var fixture in GitIgnoreCorpus.Load())
