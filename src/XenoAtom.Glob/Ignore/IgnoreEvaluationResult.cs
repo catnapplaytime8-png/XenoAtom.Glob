@@ -7,6 +7,9 @@ namespace XenoAtom.Glob.Ignore;
 /// <summary>
 /// Represents the result of evaluating ignore rules against a path.
 /// </summary>
+/// <remarks>
+/// This value is immutable and safe to read concurrently from multiple threads.
+/// </remarks>
 public readonly record struct IgnoreEvaluationResult
 {
     internal IgnoreEvaluationResult(bool isMatch, bool isIgnored, IgnoreRule? rule)

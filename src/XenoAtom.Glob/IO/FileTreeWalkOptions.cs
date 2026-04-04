@@ -10,6 +10,10 @@ namespace XenoAtom.Glob.IO;
 /// <summary>
 /// Controls file tree traversal behavior.
 /// </summary>
+/// <remarks>
+/// <para><see cref="FileTreeWalkOptions"/> is immutable after construction and may be shared across threads.</para>
+/// <para><see cref="FileTreeWalker"/> snapshots the option values and additional rule-set references when enumeration starts, so later changes to any external collection object are not observed by an in-flight traversal.</para>
+/// </remarks>
 public sealed record FileTreeWalkOptions
 {
     /// <summary>

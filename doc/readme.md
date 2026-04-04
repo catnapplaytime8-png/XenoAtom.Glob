@@ -129,6 +129,13 @@ Traversal characteristics:
 - supports cancellation through `FileTreeWalkOptions.CancellationToken`
 - snapshots the init-only `FileTreeWalkOptions` values and additional rule-set list when enumeration starts
 
+## Thread Safety
+
+- `GlobPattern`, `IgnoreRule`, `IgnoreRuleSet`, `IgnoreMatcher`, `RepositoryContext`, `FileTreeWalkOptions`, `FileTreeEntry`, `GlobPatternParseResult`, and `IgnoreEvaluationResult` are safe to share across threads.
+- `RepositoryDiscovery` is stateless and can be called concurrently.
+- `FileTreeWalker` instances can be reused concurrently to start separate traversals, but each returned enumeration must be consumed by a single thread at a time.
+- `IgnoreMatcherEvaluator` is a mutable hot-path helper. It is not thread-safe, so each concurrent worker should use its own evaluator instance.
+
 ## Benchmarks
 
 The repository includes `src/XenoAtom.Glob.Benchmarks/` with BenchmarkDotNet benchmarks for:

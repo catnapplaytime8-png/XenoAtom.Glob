@@ -9,6 +9,9 @@ namespace XenoAtom.Glob.Git;
 /// <summary>
 /// Discovers Git repository metadata for working tree paths.
 /// </summary>
+/// <remarks>
+/// <see cref="RepositoryDiscovery"/> is stateless. Its public members may be called concurrently from multiple threads.
+/// </remarks>
 public static class RepositoryDiscovery
 {
     /// <summary>

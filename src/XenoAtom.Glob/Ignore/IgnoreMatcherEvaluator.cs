@@ -11,6 +11,11 @@ namespace XenoAtom.Glob.Ignore;
 /// <summary>
 /// Reuses temporary buffers for repeated ignore evaluations.
 /// </summary>
+/// <remarks>
+/// <para><see cref="IgnoreMatcherEvaluator"/> is a mutable, reusable helper for one caller at a time.</para>
+/// <para>Instances are not thread-safe. Do not call <see cref="Evaluate(string, bool)"/>, <see cref="Evaluate(ReadOnlySpan{char}, bool)"/>, or <see cref="Dispose"/> concurrently on the same evaluator. Create a separate evaluator per concurrent worker.</para>
+/// <para>The underlying <see cref="IgnoreMatcher"/> may still be shared safely across threads.</para>
+/// </remarks>
 public sealed class IgnoreMatcherEvaluator : IDisposable
 {
     private readonly IgnoreMatcher _matcher;
@@ -67,6 +72,9 @@ public sealed class IgnoreMatcherEvaluator : IDisposable
     /// <summary>
     /// Returns pooled buffers rented by this evaluator.
     /// </summary>
+    /// <remarks>
+    /// <see cref="Dispose"/> is not thread-safe and must not run concurrently with <see cref="Evaluate(string, bool)"/> or <see cref="Evaluate(ReadOnlySpan{char}, bool)"/>.
+    /// </remarks>
     public void Dispose()
     {
         if (_normalizationBuffer.Length > 0)

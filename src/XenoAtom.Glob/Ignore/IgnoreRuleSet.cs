@@ -11,6 +11,10 @@ namespace XenoAtom.Glob.Ignore;
 /// <summary>
 /// Represents an immutable ordered set of ignore rules.
 /// </summary>
+/// <remarks>
+/// <para><see cref="IgnoreRuleSet"/> instances are immutable and may be shared across threads.</para>
+/// <para>The parse methods are stateless and may be called concurrently.</para>
+/// </remarks>
 public sealed class IgnoreRuleSet
 {
     private IgnoreRuleSet(IReadOnlyList<IgnoreRule> rules)

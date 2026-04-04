@@ -15,6 +15,11 @@ namespace XenoAtom.Glob.IO;
 /// <summary>
 /// Enumerates files and directories with optional ignore handling.
 /// </summary>
+/// <remarks>
+/// <para><see cref="FileTreeWalker"/> does not keep mutable traversal state on the instance itself, so the same walker may be used to start multiple concurrent enumerations.</para>
+/// <para>Each returned enumerable and its active enumerator are single-consumer objects and should not be advanced concurrently from multiple threads.</para>
+/// <para>When a shared <see cref="RepositoryContext"/> is supplied, ignore-cache reuse remains thread-safe.</para>
+/// </remarks>
 public sealed class FileTreeWalker
 {
     private static readonly EnumerationOptions DirectoryEnumerationOptions = new()
@@ -30,6 +35,9 @@ public sealed class FileTreeWalker
     /// <param name="rootPath">The directory to traverse.</param>
     /// <param name="options">Optional traversal options.</param>
     /// <returns>A lazy sequence of file tree entries.</returns>
+    /// <remarks>
+    /// The returned sequence is lazy and must be enumerated by one consumer at a time. Start a separate enumeration for each concurrent traversal.
+    /// </remarks>
     public IEnumerable<FileTreeEntry> Enumerate(string rootPath, FileTreeWalkOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(rootPath);

@@ -59,6 +59,13 @@ foreach (var entry in walker.Enumerate(repository.WorkingTreeRoot, new FileTreeW
 
 For more details on how to use XenoAtom.Glob, please visit the [user guide](https://github.com/xoofx/XenoAtom.Glob/blob/main/doc/readme.md).
 
+## Thread Safety
+
+- `GlobPattern`, `IgnoreRule`, `IgnoreRuleSet`, `IgnoreMatcher`, `RepositoryContext`, `FileTreeWalkOptions`, `FileTreeEntry`, and parse/evaluation result values are immutable or internally synchronized and can be shared across threads.
+- `RepositoryDiscovery` is stateless and can be called concurrently.
+- `FileTreeWalker` instances can start multiple concurrent traversals, but each returned enumeration should be consumed by only one thread at a time.
+- `IgnoreMatcherEvaluator` is intentionally reusable but not thread-safe. Create one evaluator per concurrent worker and dispose it when that worker is done.
+
 ## 🪪 License
 
 This software is released under the [BSD-2-Clause license](https://opensource.org/licenses/BSD-2-Clause). 

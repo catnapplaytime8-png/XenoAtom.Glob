@@ -7,6 +7,9 @@ namespace XenoAtom.Glob;
 /// <summary>
 /// Represents the result of parsing a glob pattern.
 /// </summary>
+/// <remarks>
+/// This value is immutable and safe to read concurrently from multiple threads.
+/// </remarks>
 public readonly record struct GlobPatternParseResult
 {
     internal GlobPatternParseResult(GlobPattern? pattern, GlobPatternParseError error)

@@ -9,6 +9,9 @@ namespace XenoAtom.Glob.Ignore;
 /// <summary>
 /// Represents one parsed ignore rule.
 /// </summary>
+/// <remarks>
+/// <see cref="IgnoreRule"/> instances are immutable and safe to share across threads.
+/// </remarks>
 public sealed class IgnoreRule
 {
     internal IgnoreRule(

@@ -11,6 +11,10 @@ namespace XenoAtom.Glob.Ignore;
 /// <summary>
 /// Evaluates layered ignore rule sets against normalized relative paths.
 /// </summary>
+/// <remarks>
+/// <para><see cref="IgnoreMatcher"/> instances are immutable after construction and may be shared across threads for concurrent evaluation.</para>
+/// <para>For repeated hot-path evaluation, use <see cref="CreateEvaluator"/> to obtain a reusable helper. Each <see cref="IgnoreMatcherEvaluator"/> instance is intended for one thread or one logical caller at a time.</para>
+/// </remarks>
 public sealed class IgnoreMatcher
 {
     private const int IndexThreshold = 32;
@@ -53,6 +57,9 @@ public sealed class IgnoreMatcher
     /// Creates a reusable evaluator that amortizes temporary buffer usage across repeated evaluations.
     /// </summary>
     /// <returns>A reusable evaluator bound to this matcher.</returns>
+    /// <remarks>
+    /// The returned evaluator is not thread-safe. Create a separate evaluator per concurrent worker.
+    /// </remarks>
     public IgnoreMatcherEvaluator CreateEvaluator() => new(this);
 
     /// <summary>

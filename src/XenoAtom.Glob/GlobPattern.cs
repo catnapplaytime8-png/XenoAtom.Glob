@@ -11,6 +11,10 @@ namespace XenoAtom.Glob;
 /// <summary>
 /// Represents a compiled glob pattern that can match relative paths.
 /// </summary>
+/// <remarks>
+/// <para><see cref="GlobPattern"/> instances are immutable and may be shared across threads for concurrent matching.</para>
+/// <para>Each call to <see cref="IsMatch(string, bool)"/> or <see cref="IsMatch(ReadOnlySpan{char}, bool)"/> is independent and does not require external synchronization.</para>
+/// </remarks>
 public sealed class GlobPattern
 {
     private static readonly PathStringComparison DefaultComparison = PathStringComparison.Ordinal;

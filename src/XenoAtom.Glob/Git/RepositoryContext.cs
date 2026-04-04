@@ -10,6 +10,11 @@ namespace XenoAtom.Glob.Git;
 /// <summary>
 /// Represents a discovered Git working tree and its ignore-related metadata.
 /// </summary>
+/// <remarks>
+/// <para><see cref="RepositoryContext"/> instances may be shared across threads.</para>
+/// <para>Repository ignore caches are synchronized internally so concurrent traversal and ignore resolution can reuse the same context safely.</para>
+/// <para>Results are still subject to normal filesystem races if ignore files change while calls are in progress.</para>
+/// </remarks>
 public sealed class RepositoryContext
 {
     private readonly object _cacheLock = new();

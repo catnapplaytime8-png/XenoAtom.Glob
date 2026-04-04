@@ -7,6 +7,9 @@ namespace XenoAtom.Glob.IO;
 /// <summary>
 /// Represents one file system entry produced by <see cref="FileTreeWalker"/>.
 /// </summary>
+/// <remarks>
+/// This value is immutable and safe to share across threads after it has been produced by enumeration.
+/// </remarks>
 public readonly record struct FileTreeEntry
 {
     /// <summary>
