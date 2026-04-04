@@ -19,13 +19,21 @@ public sealed class RepositoryContext
     private CachedIgnoreFileState _infoExcludeState;
     private readonly Dictionary<string, CachedIgnoreFileState> _perDirectoryCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CachedIgnoreStack> _repositoryIgnoreStackCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, object> _fileLoadLocks = new(StringComparer.Ordinal);
+    private readonly Func<string, string> _ignoreFileReader;
 
-    internal RepositoryContext(string workingTreeRoot, string gitDirectory, string? globalExcludePath, PathStringComparison pathComparison)
+    internal RepositoryContext(
+        string workingTreeRoot,
+        string gitDirectory,
+        string? globalExcludePath,
+        PathStringComparison pathComparison,
+        Func<string, string>? ignoreFileReader = null)
     {
         WorkingTreeRoot = workingTreeRoot;
         GitDirectory = gitDirectory;
         GlobalExcludePath = globalExcludePath;
         PathComparison = pathComparison;
+        _ignoreFileReader = ignoreFileReader ?? File.ReadAllText;
     }
 
     /// <summary>
@@ -214,42 +222,93 @@ public sealed class RepositoryContext
         out IgnoreRuleSet ruleSet)
     {
         var exists = TryGetIgnoreFileMetadata(path, out var lastWriteTimeUtc, out var length);
-        dependencies?.Add(new CachedIgnoreStackDependency(path, exists, lastWriteTimeUtc, length));
         lock (_cacheLock)
         {
+            RefreshCachedState(key, ref hasState, ref state);
             if (hasState &&
                 state.Exists == exists &&
                 (!exists || (state.LastWriteTimeUtc == lastWriteTimeUtc && state.Length == length)))
             {
+                dependencies?.Add(new CachedIgnoreStackDependency(path, exists, lastWriteTimeUtc, length));
                 ruleSet = state.RuleSet!;
                 return exists;
             }
         }
 
-        if (!exists)
-        {
-            lock (_cacheLock)
-            {
-                UpdateCachedState(key, ref hasState, ref state, new CachedIgnoreFileState(false, default, 0, null));
-            }
-
-            ruleSet = null!;
-            return false;
-        }
-
-        var parsedRuleSet = IgnoreRuleSet.ParseGitIgnore(
-            File.ReadAllText(path),
-            baseDirectory: baseDirectory,
-            sourcePath: path,
-            sourceKind: sourceKind);
-
+        object fileLoadLock;
         lock (_cacheLock)
         {
-            UpdateCachedState(key, ref hasState, ref state, new CachedIgnoreFileState(true, lastWriteTimeUtc, length, parsedRuleSet));
+            fileLoadLock = GetFileLoadLock(path);
         }
 
-        ruleSet = parsedRuleSet;
-        return true;
+        lock (fileLoadLock)
+        {
+            exists = TryGetIgnoreFileMetadata(path, out lastWriteTimeUtc, out length);
+            lock (_cacheLock)
+            {
+                RefreshCachedState(key, ref hasState, ref state);
+                if (hasState &&
+                    state.Exists == exists &&
+                    (!exists || (state.LastWriteTimeUtc == lastWriteTimeUtc && state.Length == length)))
+                {
+                    dependencies?.Add(new CachedIgnoreStackDependency(path, exists, lastWriteTimeUtc, length));
+                    ruleSet = state.RuleSet!;
+                    return exists;
+                }
+            }
+
+            dependencies?.Add(new CachedIgnoreStackDependency(path, exists, lastWriteTimeUtc, length));
+            if (!exists)
+            {
+                lock (_cacheLock)
+                {
+                    UpdateCachedState(key, ref hasState, ref state, new CachedIgnoreFileState(false, default, 0, null));
+                }
+
+                ruleSet = null!;
+                return false;
+            }
+
+            var parsedRuleSet = IgnoreRuleSet.ParseGitIgnore(
+                _ignoreFileReader(path),
+                baseDirectory: baseDirectory,
+                sourcePath: path,
+                sourceKind: sourceKind);
+
+            lock (_cacheLock)
+            {
+                UpdateCachedState(key, ref hasState, ref state, new CachedIgnoreFileState(true, lastWriteTimeUtc, length, parsedRuleSet));
+            }
+
+            ruleSet = parsedRuleSet;
+            return true;
+        }
+    }
+
+    private void RefreshCachedState(string? key, ref bool hasState, ref CachedIgnoreFileState state)
+    {
+        if (key is null)
+        {
+            return;
+        }
+
+        if (_perDirectoryCache.TryGetValue(key, out var sharedState))
+        {
+            hasState = true;
+            state = sharedState;
+        }
+    }
+
+    private object GetFileLoadLock(string path)
+    {
+        if (_fileLoadLocks.TryGetValue(path, out var fileLoadLock))
+        {
+            return fileLoadLock;
+        }
+
+        fileLoadLock = new object();
+        _fileLoadLocks.Add(path, fileLoadLock);
+        return fileLoadLock;
     }
 
     private static bool TryGetIgnoreFileMetadata(string path, out DateTime lastWriteTimeUtc, out long length)

@@ -81,6 +81,55 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void Evaluate_ShouldUseAncestorEvaluationForBasenameRules()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("vendor"));
+
+        var result = matcher.Evaluate("src/vendor/file.txt");
+
+        Assert.IsTrue(result.IsIgnored);
+        Assert.AreEqual("vendor", result.Rule!.PatternText);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldPreservePrecedenceForIndexedBasenameRules()
+    {
+        var rules = Enumerable.Range(0, 40)
+            .Select(static index => $"*.noise{index}")
+            .Append("*.tmp")
+            .Append("!keep.tmp");
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(string.Join('\n', rules)));
+
+        var ignored = matcher.Evaluate("build/file.tmp");
+        var included = matcher.Evaluate("build/keep.tmp");
+
+        Assert.IsTrue(ignored.IsIgnored);
+        Assert.AreEqual("*.tmp", ignored.Rule!.PatternText);
+        Assert.IsTrue(included.IsMatch);
+        Assert.IsFalse(included.IsIgnored);
+        Assert.AreEqual("!keep.tmp", included.Rule!.RawPatternText);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldAllowFallbackRulesToOverrideIndexedBasenameRules()
+    {
+        var rules = Enumerable.Range(0, 40)
+            .Select(static index => $"*.noise{index}")
+            .Append("*.tmp")
+            .Append("!src/**/keep.tmp");
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(string.Join('\n', rules)));
+
+        var ignored = matcher.Evaluate("other/keep.tmp");
+        var included = matcher.Evaluate("src/deep/keep.tmp");
+
+        Assert.IsTrue(ignored.IsIgnored);
+        Assert.AreEqual("*.tmp", ignored.Rule!.PatternText);
+        Assert.IsTrue(included.IsMatch);
+        Assert.IsFalse(included.IsIgnored);
+        Assert.AreEqual("!src/**/keep.tmp", included.Rule!.RawPatternText);
+    }
+
+    [TestMethod]
     public void Evaluate_ShouldStopAtIgnoredAncestorDirectory()
     {
         var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""

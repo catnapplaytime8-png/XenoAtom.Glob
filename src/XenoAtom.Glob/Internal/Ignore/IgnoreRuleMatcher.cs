@@ -26,30 +26,19 @@ internal static class IgnoreRuleMatcher
         var relativePath = candidatePath.Slice(relativeStart, relativeLength);
         if (rule.BasenameOnly)
         {
-            var segmentStart = 0;
-            for (var index = 0; index <= relativePath.Length; index++)
+            var lastSeparator = relativePath.LastIndexOf('/');
+            var finalSegment = lastSeparator >= 0 ? relativePath[(lastSeparator + 1)..] : relativePath;
+            if (finalSegment.Length == 0)
             {
-                if (index < relativePath.Length && relativePath[index] != '/')
-                {
-                    continue;
-                }
-
-                var segmentIsDirectory = index < relativePath.Length || isDirectory;
-                if (rule.DirectoryOnly && !segmentIsDirectory)
-                {
-                    segmentStart = index + 1;
-                    continue;
-                }
-
-                if (rule.CompiledPattern.Match(relativePath.Slice(segmentStart, index - segmentStart), segmentIsDirectory, segmentCount: 1, comparison))
-                {
-                    return true;
-                }
-
-                segmentStart = index + 1;
+                return false;
             }
 
-            return false;
+            if (rule.DirectoryOnly && !isDirectory)
+            {
+                return false;
+            }
+
+            return rule.CompiledPattern.Match(finalSegment, isDirectory, segmentCount: 1, comparison);
         }
 
         var matchedSegmentCount = 0;
