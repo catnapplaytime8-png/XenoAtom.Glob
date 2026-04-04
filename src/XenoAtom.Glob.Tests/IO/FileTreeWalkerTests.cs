@@ -7,6 +7,7 @@ using GitIgnore = LibGit2Sharp.Ignore;
 
 using XenoAtom.Glob.Git;
 using XenoAtom.Glob.IO;
+using XenoAtom.Glob.Ignore;
 using XenoAtom.Glob.Tests.TestInfrastructure;
 
 namespace XenoAtom.Glob.Tests.IO;
@@ -349,6 +350,29 @@ public class FileTreeWalkerTests
                 CancellationToken = cancellationTokenSource.Token,
             }).ToArray();
         });
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldSnapshotAdditionalRuleSetsBeforeEnumeration()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.WriteAllText("file.tmp", string.Empty);
+
+        var additionalRuleSets = new List<IgnoreRuleSet>();
+        var walker = new FileTreeWalker();
+        var enumerable = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions
+        {
+            AdditionalRuleSets = additionalRuleSets,
+        });
+
+        additionalRuleSets.Add(IgnoreRuleSet.ParseGitIgnore("*.tmp\n"));
+
+        var entries = enumerable
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { "file.tmp" }, entries);
     }
 
     [TestMethod]

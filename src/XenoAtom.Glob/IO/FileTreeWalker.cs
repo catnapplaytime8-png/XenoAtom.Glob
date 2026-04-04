@@ -34,10 +34,13 @@ public sealed class FileTreeWalker
     {
         ArgumentNullException.ThrowIfNull(rootPath);
 
-        options ??= new FileTreeWalkOptions();
+        var effectiveOptions = options ?? new FileTreeWalkOptions();
         var fullRootPath = Path.GetFullPath(rootPath);
-        var repositoryContext = options.RepositoryContext;
-        IReadOnlyList<IgnoreRuleSet> rootRuleSets = options.AdditionalRuleSets ?? [];
+        var repositoryContext = effectiveOptions.RepositoryContext;
+        var includeDirectories = effectiveOptions.IncludeDirectories;
+        var followSymbolicLinks = effectiveOptions.FollowSymbolicLinks;
+        var cancellationToken = effectiveOptions.CancellationToken;
+        IReadOnlyList<IgnoreRuleSet> rootRuleSets = SnapshotRuleSets(effectiveOptions.AdditionalRuleSets);
         var startRelativeDirectory = string.Empty;
 
         if (repositoryContext is not null)
@@ -46,33 +49,42 @@ public sealed class FileTreeWalker
         }
 
         var rootIgnoreStack =
-            repositoryContext is not null && (options.AdditionalRuleSets is null || options.AdditionalRuleSets.Count == 0)
+            repositoryContext is not null && rootRuleSets.Count == 0
                 ? repositoryContext.GetRepositoryIgnoreStack(startRelativeDirectory)
                 : new IgnoreStack(
                     repositoryContext is not null
-                        ? MergeRuleSets(repositoryContext.CreateInitialRuleSets(startRelativeDirectory), options.AdditionalRuleSets)
+                        ? MergeRuleSets(repositoryContext.CreateInitialRuleSets(startRelativeDirectory), rootRuleSets)
                         : rootRuleSets,
                     repositoryContext?.PathComparison ?? PathStringComparison.CurrentPlatformDefault);
-        return EnumerateCore(fullRootPath, startRelativeDirectory, rootIgnoreStack, options, repositoryContext);
+        return EnumerateCore(
+            fullRootPath,
+            startRelativeDirectory,
+            rootIgnoreStack,
+            includeDirectories,
+            followSymbolicLinks,
+            cancellationToken,
+            repositoryContext);
     }
 
     private IEnumerable<FileTreeEntry> EnumerateCore(
         string directoryPath,
         string relativeDirectory,
         IgnoreStack ignoreStack,
-        FileTreeWalkOptions options,
+        bool includeDirectories,
+        bool followSymbolicLinks,
+        CancellationToken cancellationToken,
         RepositoryContext? repositoryContext)
     {
-        options.CancellationToken.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
 
         foreach (var entry in EnumerateDirectory(
             directoryPath,
             relativeDirectory,
             ignoreStack.Matcher,
             repositoryContext,
-            options.FollowSymbolicLinks))
+            followSymbolicLinks))
         {
-            options.CancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
             var relativePath = relativeDirectory.Length == 0 ? entry.Name : $"{relativeDirectory}/{entry.Name}";
             var fullPath = Path.Join(directoryPath, entry.Name);
@@ -90,13 +102,20 @@ public sealed class FileTreeWalker
 
             if (entry.IsDirectory)
             {
-                if (options.IncludeDirectories)
+                if (includeDirectories)
                 {
                     yield return yieldedEntry;
                 }
 
                 var childIgnoreStack = ignoreStack.PushDirectory(repositoryContext, relativePath);
-                foreach (var childEntry in EnumerateCore(fullPath, relativePath, childIgnoreStack, options, repositoryContext))
+                foreach (var childEntry in EnumerateCore(
+                    fullPath,
+                    relativePath,
+                    childIgnoreStack,
+                    includeDirectories,
+                    followSymbolicLinks,
+                    cancellationToken,
+                    repositoryContext))
                 {
                     yield return childEntry;
                 }
@@ -108,11 +127,27 @@ public sealed class FileTreeWalker
         }
     }
 
+    private static IReadOnlyList<IgnoreRuleSet> SnapshotRuleSets(IReadOnlyList<IgnoreRuleSet>? ruleSets)
+    {
+        if (ruleSets is null || ruleSets.Count == 0)
+        {
+            return [];
+        }
+
+        var snapshot = new IgnoreRuleSet[ruleSets.Count];
+        for (var index = 0; index < ruleSets.Count; index++)
+        {
+            snapshot[index] = ruleSets[index];
+        }
+
+        return snapshot;
+    }
+
     private static IReadOnlyList<IgnoreRuleSet> MergeRuleSets(
         IReadOnlyList<IgnoreRuleSet> initialRuleSets,
-        IReadOnlyList<IgnoreRuleSet>? additionalRuleSets)
+        IReadOnlyList<IgnoreRuleSet> additionalRuleSets)
     {
-        if (additionalRuleSets is null || additionalRuleSets.Count == 0)
+        if (additionalRuleSets.Count == 0)
         {
             return initialRuleSets;
         }

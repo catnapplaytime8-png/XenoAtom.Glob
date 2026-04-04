@@ -10,32 +10,32 @@ namespace XenoAtom.Glob.IO;
 /// <summary>
 /// Controls file tree traversal behavior.
 /// </summary>
-public sealed class FileTreeWalkOptions
+public sealed record FileTreeWalkOptions
 {
     /// <summary>
-    /// Gets or sets a value indicating whether directory entries should be yielded.
+    /// Gets a value indicating whether directory entries should be yielded.
     /// </summary>
-    public bool IncludeDirectories { get; set; }
+    public bool IncludeDirectories { get; init; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether symbolic links and reparse points should be followed.
+    /// Gets a value indicating whether symbolic links and reparse points should be followed.
     /// The default is <see langword="false"/>.
     /// </summary>
-    public bool FollowSymbolicLinks { get; set; }
+    public bool FollowSymbolicLinks { get; init; }
 
     /// <summary>
-    /// Gets or sets the cancellation token used during traversal.
+    /// Gets the cancellation token used during traversal.
     /// </summary>
-    public CancellationToken CancellationToken { get; set; }
+    public CancellationToken CancellationToken { get; init; }
 
     /// <summary>
-    /// Gets or sets the repository context used for Git-aware ignore resolution.
+    /// Gets the repository context used for Git-aware ignore resolution.
     /// </summary>
-    public RepositoryContext? RepositoryContext { get; set; }
+    public RepositoryContext? RepositoryContext { get; init; }
 
     /// <summary>
-    /// Gets or sets additional ignore rule sets that participate in traversal.
+    /// Gets the additional ignore rule sets that participate in traversal.
     /// Later rule sets have higher precedence. Entry ordering is otherwise unspecified.
     /// </summary>
-    public IReadOnlyList<IgnoreRuleSet>? AdditionalRuleSets { get; set; }
+    public IReadOnlyList<IgnoreRuleSet>? AdditionalRuleSets { get; init; }
 }
