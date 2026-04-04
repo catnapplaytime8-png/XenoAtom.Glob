@@ -2,6 +2,8 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using System.Reflection;
+
 using LibGit2Sharp;
 using GitIgnore = LibGit2Sharp.Ignore;
 
@@ -15,6 +17,9 @@ namespace XenoAtom.Glob.Tests.IO;
 [TestClass]
 public class FileTreeWalkerTests
 {
+    private const string CodeCorpusEnabledEnvironmentVariable = "XENOATOM_GLOB_ENABLE_CODE_CORPUS";
+    private const string DisabledCodeCorpusDataMarker = "<disabled>";
+
     [TestMethod]
     public void Enumerate_ShouldReturnAllFilesWhenNoIgnoreRulesExist()
     {
@@ -159,20 +164,21 @@ public class FileTreeWalkerTests
     public void Enumerate_ShouldMatchLibGit2SharpVisibleFilesForCurrentRepository()
     {
         var repositoryRoot = FindCurrentRepositoryRoot();
+        AssertMatchesLibGit2SharpVisibleFiles(repositoryRoot);
+    }
 
-        var walker = new FileTreeWalker();
-        var context = RepositoryDiscovery.Discover(repositoryRoot);
-        var actual = walker.Enumerate(repositoryRoot, new FileTreeWalkOptions { RepositoryContext = context })
-            .Select(static x => x.RelativePath)
-            .OrderBy(static x => x, StringComparer.Ordinal)
-            .ToArray();
+    [TestMethod]
+    [DynamicData(nameof(GetRepositoryRootsNearCurrentRepository), DynamicDataDisplayName = nameof(GetRepositoryRootsNearCurrentRepositoryDisplayName))]
+    public void Enumerate_ShouldMatchGitVisibleFilesForRepositoryNearby(string repositoryRoot)
+    {
+        if (string.Equals(repositoryRoot, DisabledCodeCorpusDataMarker, StringComparison.Ordinal))
+        {
+            Assert.Inconclusive(
+                $"Set {CodeCorpusEnabledEnvironmentVariable}=1 and ensure C:\\code exists to enable the local repository corpus test.");
+            return;
+        }
 
-        using var repository = new Repository(repositoryRoot);
-        var expected = EnumerateVisibleFilesWithLibGit2Sharp(repositoryRoot, repository.Ignore)
-            .OrderBy(static x => x, StringComparer.Ordinal)
-            .ToArray();
-
-        CollectionAssert.AreEqual(expected, actual, BuildPathMismatchMessage(expected, actual));
+        AssertMatchesGitVisibleFiles(repositoryRoot);
     }
 
     [TestMethod]
@@ -548,6 +554,11 @@ public class FileTreeWalkerTests
 
                 if (isDirectory)
                 {
+                    if (HasNestedGitBoundary(path))
+                    {
+                        continue;
+                    }
+
                     stack.Push((path, relativePath));
                     continue;
                 }
@@ -556,6 +567,227 @@ public class FileTreeWalkerTests
             }
         }
     }
+
+    private static IEnumerable<string> EnumerateCandidateFilesForGitComparison(string repositoryRoot)
+    {
+        var stack = new Stack<(string FullPath, string RelativePath)>();
+        stack.Push((repositoryRoot, string.Empty));
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            foreach (var path in Directory.EnumerateFileSystemEntries(current.FullPath))
+            {
+                var name = Path.GetFileName(path);
+                if (string.Equals(name, ".git", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    continue;
+                }
+
+                var isDirectory = (attributes & FileAttributes.Directory) != 0;
+                var relativePath = current.RelativePath.Length == 0 ? name : $"{current.RelativePath}/{name}";
+                if (isDirectory)
+                {
+                    if (HasNestedGitBoundary(path))
+                    {
+                        continue;
+                    }
+
+                    stack.Push((path, relativePath));
+                    continue;
+                }
+
+                yield return relativePath;
+            }
+        }
+    }
+
+    private static void AssertMatchesLibGit2SharpVisibleFiles(string repositoryRoot)
+    {
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(repositoryRoot);
+        var actual = walker.Enumerate(repositoryRoot, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        Repository repository;
+        try
+        {
+            repository = new Repository(repositoryRoot);
+        }
+        catch (Exception ex) when (ex is RepositoryNotFoundException or LibGit2SharpException)
+        {
+            Assert.Inconclusive($"LibGit2Sharp could not open repository '{repositoryRoot}': {ex.Message}");
+            return;
+        }
+
+        using (repository)
+        {
+            var expected = EnumerateVisibleFilesWithLibGit2Sharp(repositoryRoot, repository.Ignore)
+                .OrderBy(static x => x, StringComparer.Ordinal)
+                .ToArray();
+
+            CollectionAssert.AreEqual(expected, actual, BuildPathMismatchMessage(expected, actual));
+        }
+    }
+
+    private static void AssertMatchesGitVisibleFiles(string repositoryRoot)
+    {
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(repositoryRoot);
+        var actual = walker.Enumerate(repositoryRoot, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        string[] expected;
+        try
+        {
+            var git = GitCli.In(repositoryRoot);
+            var candidatePaths = EnumerateCandidateFilesForGitComparison(repositoryRoot)
+                .OrderBy(static x => x, StringComparer.Ordinal)
+                .ToArray();
+            expected = QueryVisiblePathsFromGit(git, candidatePaths)
+                .OrderBy(static x => x, StringComparer.Ordinal)
+                .ToArray();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Assert.Inconclusive($"Git CLI could not enumerate repository '{repositoryRoot}': {ex.Message}");
+            return;
+        }
+
+        CollectionAssert.AreEqual(expected, actual, BuildPathMismatchMessage(expected, actual));
+    }
+
+    public static IEnumerable<object[]> GetRepositoryRootsNearCurrentRepository()
+    {
+        if (!IsCodeCorpusEnabled())
+        {
+            yield return new object[] { DisabledCodeCorpusDataMarker };
+            yield break;
+        }
+
+        var scanRoot = FindRepositoryScanRoot();
+        if (string.IsNullOrEmpty(scanRoot))
+        {
+            yield return new object[] { DisabledCodeCorpusDataMarker };
+            yield break;
+        }
+
+        foreach (var repositoryRoot in EnumerateRepositoryRoots(scanRoot)
+                     .OrderBy(static x => x, GetPathComparer()))
+        {
+            yield return new object[] { repositoryRoot };
+        }
+    }
+
+    public static string GetRepositoryRootsNearCurrentRepositoryDisplayName(MethodInfo methodInfo, object[] data)
+    {
+        var repositoryRoot = (string)data[0];
+        if (string.Equals(repositoryRoot, DisabledCodeCorpusDataMarker, StringComparison.Ordinal))
+        {
+            return $"{methodInfo.Name} (disabled)";
+        }
+
+        var scanRoot = FindRepositoryScanRoot();
+        var relativePath = string.IsNullOrEmpty(scanRoot)
+            ? repositoryRoot
+            : Path.GetRelativePath(scanRoot, repositoryRoot).Replace('\\', '/');
+        return $"{methodInfo.Name} ({relativePath})";
+    }
+
+    private static IEnumerable<string> EnumerateRepositoryRoots(string scanRoot)
+    {
+        var pending = new Stack<string>();
+        var comparer = GetPathComparer();
+        var seen = new HashSet<string>(comparer);
+        pending.Push(scanRoot);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            var fullCurrentPath = Path.GetFullPath(current);
+            if (!seen.Add(fullCurrentPath))
+            {
+                continue;
+            }
+
+            if (HasNestedGitDirectory(fullCurrentPath))
+            {
+                yield return fullCurrentPath;
+            }
+
+            IEnumerable<string> children;
+            try
+            {
+                children = Directory.EnumerateDirectories(fullCurrentPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                if (string.Equals(Path.GetFileName(child), ".git", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var attributes = File.GetAttributes(child);
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        continue;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                pending.Push(child);
+            }
+        }
+    }
+
+    private static bool HasNestedGitDirectory(string path)
+        => Directory.Exists(Path.Combine(path, ".git"));
+
+    private static bool HasNestedGitBoundary(string path)
+    {
+        var dotGitPath = Path.Combine(path, ".git");
+        return Directory.Exists(dotGitPath) || File.Exists(dotGitPath);
+    }
+
+    private static string FindRepositoryScanRoot()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return string.Empty;
+        }
+
+        const string codeRoot = @"C:\code";
+        return Directory.Exists(codeRoot) ? codeRoot : string.Empty;
+    }
+
+    private static bool IsCodeCorpusEnabled()
+        => string.Equals(
+            Environment.GetEnvironmentVariable(CodeCorpusEnabledEnvironmentVariable),
+            "1",
+            StringComparison.Ordinal);
+
+    private static StringComparer GetPathComparer()
+        => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     private static string FindCurrentRepositoryRoot()
     {
@@ -580,7 +812,7 @@ public class FileTreeWalkerTests
         var onlyActual = actual.Except(expected, StringComparer.Ordinal).Take(20).ToArray();
 
         return $"""
-            Visible file sets diverged between XenoAtom.Glob and LibGit2Sharp.
+            Visible file sets diverged.
             Expected count: {expected.Count}
             Actual count: {actual.Count}
             Only in expected: [{string.Join(", ", onlyExpected)}]
