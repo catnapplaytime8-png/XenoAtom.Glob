@@ -13,7 +13,7 @@ Environment:
 Release-quality runs used the built-in `--release` mode, which fixes the BenchmarkDotNet job at `WarmupCount=6` and `IterationCount=15`.
 
 ```sh
-dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --release --filter "*PathBenchmarks*" "*GlobBenchmarks*" "*IgnoreBenchmarks*" "*TraversalBenchmarks.EnumerateWithoutIgnoreRules*" "*TraversalBenchmarks.EnumerateWithoutIgnoreRulesWithRawRecursiveRuntimeEnumerator*" "*TraversalBenchmarks.EnumerateWithPrunedDirectories*" "*TraversalBenchmarks.EnumerateWhereAllRootEntriesAreSkipped*" "*RepositoryTraversalBenchmarks*"
+dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --release --filter "*PathBenchmarks*" "*GlobBenchmarks*" "*IgnoreBenchmarks*" "*SpanApiBenchmarks*" "*ParseBenchmarks*" "*TraversalBenchmarks.EnumerateWithoutIgnoreRules*" "*TraversalBenchmarks.EnumerateWithoutIgnoreRulesWithRawRecursiveRuntimeEnumerator*" "*TraversalBenchmarks.EnumerateWithPrunedDirectories*" "*TraversalBenchmarks.EnumerateWhereAllRootEntriesAreSkipped*" "*RepositoryTraversalBenchmarks*"
 ```
 
 Smoke runs are intentionally shorter and are only for harness validation or quick local checks. They must not be used for release claims.
@@ -35,9 +35,17 @@ Release-grade reruns show:
 - `GlobBenchmarks.MatchLiteralPath` allocates `0 B` for already-normalized input.
 - `GlobBenchmarks.MatchLiteralPathWithNormalizationRequired` allocates `56 B`; the allocation only appears once normalization has to produce a new normalized path string.
 - `GlobBenchmarks.EvaluateIgnoreDecision` and `EvaluateIgnoreDecisionPreNormalizedCore` both allocate `32 B` in the tested directory-rule scenario, which rules out public path normalization as the source for that case.
-- The expanded `IgnoreBenchmarks` matrix is allocation-free for the public `EvaluateIgnoreDecision` scenarios that use basename and deep full-path rules, but some internal pre-normalized-core variants still show `32 B`.
+- `SpanApiBenchmarks.MatchLiteralPathWithNormalizationRequiredSpan` removes that public normalization allocation entirely and drops the same scenario to `0 B`.
+- `SpanApiBenchmarks.EvaluateIgnoreDecisionWithNormalizationRequiredString` allocates `96 B`, while the span overload removes that normalization cost entirely and drops the same scenario to `0 B`.
+- `ParseBenchmarks.ParseRecursivePattern` now allocates `1.91 KB`, down from the earlier `2032 B` snapshot after the span-based parser cleanup.
+- The expanded `IgnoreBenchmarks` matrix is still allocation-free for the public `EvaluateIgnoreDecision` scenarios that use basename and deep full-path rules, and the new indexed-rule scenarios stay allocation-free as well.
 
-The actionable conclusion is narrower than the original report: normalization is a confirmed allocation source only when the input actually needs normalization, and any remaining ignore-evaluation allocation is inside matcher internals rather than at the public string entry point.
+The actionable conclusion is now broader and better evidenced:
+
+- normalization is a confirmed allocation source only when the input actually needs normalization
+- the new public span overloads remove that public normalization allocation for matching and ignore evaluation
+- the remaining `32 B` ignore-allocation case is specific to the existing directory-rule benchmark shape, not to public string normalization
+- parser allocation work is measurable on glob compilation, while ignore-file parse totals are still dominated by the retained rule object graph
 
 ## Path And Glob Results
 
@@ -46,7 +54,7 @@ The actionable conclusion is narrower than the original report: normalization is
 | path | `NormalizeAlreadyNormalizedPath` | `20.49 ns` | `0 B` |
 | path | `NormalizeWindowsStylePath` | `40.08 ns` | `80 B` |
 | path | `NormalizeUnixStylePath` | `50.01 ns` | `80 B` |
-| glob | `ParseRecursivePattern` | `251.34 ns` | `2032 B` |
+| glob | `ParseRecursivePattern` | `242.56 ns` | `1.91 KB` |
 | glob | `MatchLiteralPath` | `24.47 ns` | `0 B` |
 | glob | `MatchLiteralPathFailure` | `23.86 ns` | `0 B` |
 | glob | `MatchLiteralPathPreNormalizedCore` | `7.20 ns` | `0 B` |
@@ -58,6 +66,17 @@ The actionable conclusion is narrower than the original report: normalization is
 | ignore | `GlobBenchmarks.EvaluateIgnoreDecision` | `42.51 ns` | `32 B` |
 | ignore | `GlobBenchmarks.EvaluateIgnoreDecisionPreNormalizedCore` | `27.28 ns` | `32 B` |
 
+## Public Span API Results
+
+These targeted release benchmarks exercise the public `ReadOnlySpan<char>` entry points on normalization-required inputs:
+
+| Benchmark | Mean | Allocated |
+| --- | ---: | ---: |
+| `MatchLiteralPathWithNormalizationRequiredString` | `40.88 ns` | `56 B` |
+| `MatchLiteralPathWithNormalizationRequiredSpan` | `27.89 ns` | `0 B` |
+| `EvaluateIgnoreDecisionWithNormalizationRequiredString` | `81.29 ns` | `96 B` |
+| `EvaluateIgnoreDecisionWithNormalizationRequiredSpan` | `49.38 ns` | `0 B` |
+
 ## Ignore Scaling
 
 The ignore benchmark matrix now covers:
@@ -65,6 +84,7 @@ The ignore benchmark matrix now covers:
 - basename hit and miss cases
 - deep full-path hit and miss cases
 - rule-set sizes `1`, `10`, `100`, and `1000`
+- targeted large-rule-set exact-basename and extension-suffix cases that exercise the matcher index
 
 Selected public-entry-point results:
 
@@ -75,7 +95,30 @@ Selected public-entry-point results:
 | `DeepHit` | `980.11 ns` | `5.05 us` | `46.30 us` | `454.59 us` |
 | `DeepMiss` | `1.01 us` | `5.94 us` | `47.05 us` | `519.39 us` |
 
-The public benchmark path stayed allocation-free across that matrix. The pre-normalized-core variants are useful for internal investigation, but they are not currently evidence for a public span-overload win by themselves.
+The baseline deep-rule matrix still scales with rule count because those scenarios are intentionally dominated by non-indexable full-path patterns.
+
+The new index-focused release reruns show the intended large-rule-set win for simple basename-heavy rule sets:
+
+| Scenario | 1000 rules |
+| --- | ---: |
+| `IndexedExactHit` | `165.69 ns` |
+| `IndexedExactMiss` | `150.17 ns` |
+| `IndexedExtensionHit` | `108.87 ns` |
+| `IndexedExtensionMiss` | `89.16 ns` |
+
+Those indexed scenarios stay allocation-free and avoid the `173 us` to `519 us` scaling behavior seen in the deep fallback-heavy matrix.
+
+## Parse Results
+
+The parser benchmarks now cover both glob compilation and full ignore-file parsing:
+
+| Benchmark | Mean | Allocated |
+| --- | ---: | ---: |
+| `ParseRecursivePattern` | `242.56 ns` | `1.91 KB` |
+| `ParseGitIgnoreString` | `32.78 us` | `228.85 KB` |
+| `ParseGitIgnoreSpan` | `34.42 us` | `228.85 KB` |
+
+The glob-parser cleanup reduced the transient allocation footprint of recursive pattern compilation. The ignore-file span entry point removes the initial full-content copy and per-line string splitting, but the total benchmark allocation is still dominated by the retained `IgnoreRule`, token, and pattern object graph that both public parse paths must build.
 
 ## Traversal Results
 
