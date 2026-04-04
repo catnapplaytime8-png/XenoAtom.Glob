@@ -146,5 +146,3 @@ The repository includes `src/XenoAtom.Glob.Benchmarks/` with BenchmarkDotNet ben
 - traversal with and without ignore pruning
 - matching of a pre-collected current-repository file list using the real `.gitignore` stack
 - comparison against `LibGit2Sharp.Ignore.IsPathIgnored` on the same pre-collected repository inputs
-
-The latest recorded benchmark notes are available in [benchmarks/latest.md](./benchmarks/latest.md).
