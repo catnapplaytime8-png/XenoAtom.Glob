@@ -543,6 +543,31 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void Evaluate_ShouldSupportUnicodePaths()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("**/\u00E9t\u00E9.tmp\n"));
+
+        var result = matcher.Evaluate("donn\u00E9es/\u00E9t\u00E9.tmp");
+        var nonMatch = matcher.Evaluate("donnees/ete.tmp");
+
+        Assert.IsTrue(result.IsIgnored);
+        Assert.IsFalse(nonMatch.IsMatch);
+    }
+
+    [TestMethod]
+    public void EvaluateWithReusableEvaluator_ShouldSupportLongReadOnlySpanPaths()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("**/target.tmp"));
+        using var evaluator = matcher.CreateEvaluator();
+        ReadOnlySpan<char> candidate = CreateLongRelativePath(segmentCount: 36, segmentLength: 8, leafName: "target.tmp");
+
+        var result = evaluator.Evaluate(candidate);
+
+        Assert.IsTrue(result.IsIgnored);
+        Assert.AreEqual("**/target.tmp", result.Rule!.PatternText);
+    }
+
+    [TestMethod]
     public void EvaluateWithReusableEvaluator_ShouldMatchDefaultEvaluation()
     {
         var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
@@ -598,5 +623,11 @@ public class IgnoreMatcherTests
     public void ParseGitIgnore_ShouldRejectInvalidTrailingEscape()
     {
         Assert.Throws<ArgumentException>(() => IgnoreRuleSet.ParseGitIgnore("broken\\"));
+    }
+
+    private static string CreateLongRelativePath(int segmentCount, int segmentLength, string leafName)
+    {
+        var segments = Enumerable.Repeat(new string('a', segmentLength), segmentCount);
+        return string.Join('/', segments.Append(leafName));
     }
 }

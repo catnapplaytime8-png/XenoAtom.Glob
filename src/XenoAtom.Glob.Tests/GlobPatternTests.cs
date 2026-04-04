@@ -133,6 +133,24 @@ public class GlobPatternTests
     }
 
     [TestMethod]
+    public void IsMatch_ShouldSupportUnicodePaths()
+    {
+        var pattern = GlobPattern.Parse("donn\u00E9es/**/\u00E9t\u00E9.txt");
+
+        Assert.IsTrue(pattern.IsMatch("donn\u00E9es/archives/\u00E9t\u00E9.txt"));
+        Assert.IsFalse(pattern.IsMatch("donnees/archives/ete.txt"));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldSupportLongReadOnlySpanPaths()
+    {
+        var pattern = GlobPattern.Parse("**/target.txt");
+        ReadOnlySpan<char> candidate = CreateLongRelativePath(segmentCount: 36, segmentLength: 8, leafName: "target.txt");
+
+        Assert.IsTrue(pattern.IsMatch(candidate));
+    }
+
+    [TestMethod]
     public void IsMatch_ShouldTreatExplicitDirectoryFlagLikeTrailingSeparator()
     {
         var pattern = GlobPattern.Parse("src");
@@ -184,5 +202,11 @@ public class GlobPatternTests
         var ex = Assert.Throws<ArgumentException>(() => GlobPattern.Parse("file[9-0].txt"));
 
         StringAssert.Contains(ex.Message, "invalid character class range", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateLongRelativePath(int segmentCount, int segmentLength, string leafName)
+    {
+        var segments = Enumerable.Repeat(new string('a', segmentLength), segmentCount);
+        return string.Join('/', segments.Append(leafName));
     }
 }
