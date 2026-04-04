@@ -271,6 +271,58 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void EvaluateWithReusableEvaluator_ShouldMatchDefaultEvaluation()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
+            *.tmp
+            !keep.tmp
+            src/**/generated/
+            """));
+        using var evaluator = matcher.CreateEvaluator();
+        var paths = new[]
+        {
+            "file.tmp",
+            "keep.tmp",
+            "src/generated",
+            "src/deep/generated/file.cs",
+            "src/app/main.cs",
+        };
+
+        foreach (var path in paths)
+        {
+            Assert.AreEqual(matcher.Evaluate(path), evaluator.Evaluate(path), $"Mismatch for path '{path}'.");
+        }
+    }
+
+    [TestMethod]
+    public void EvaluateWithReusableEvaluator_ShouldAvoidManagedAllocationsForNormalizedPaths()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
+            *.tmp
+            !keep.tmp
+            vendor/
+            """));
+        using var evaluator = matcher.CreateEvaluator();
+
+        _ = evaluator.Evaluate("src/file.tmp");
+        _ = evaluator.Evaluate("vendor/lib/file.cs");
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 512; index++)
+        {
+            _ = evaluator.Evaluate("src/file.tmp");
+            _ = evaluator.Evaluate("vendor/lib/file.cs");
+        }
+
+        var after = GC.GetAllocatedBytesForCurrentThread();
+        Assert.AreEqual(before, after);
+    }
+
+    [TestMethod]
     public void ParseGitIgnore_ShouldRejectInvalidTrailingEscape()
     {
         Assert.Throws<ArgumentException>(() => IgnoreRuleSet.ParseGitIgnore("broken\\"));

@@ -2,6 +2,8 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using System.Buffers;
+
 namespace XenoAtom.Glob.Internal;
 
 internal sealed class GlobCompiledPattern
@@ -39,9 +41,9 @@ internal sealed class GlobCompiledPattern
     public string? SuffixText { get; }
 
     public bool Match(NormalizedPath path, PathStringComparison comparison)
-        => Match(path.Value.AsSpan(), path.IsDirectory, path.SegmentCount, comparison);
+        => Match(path.Value.AsSpan(), path.IsDirectory, path.SegmentCount, comparison, evaluator: null);
 
-    public bool Match(ReadOnlySpan<char> path, bool isDirectory, int segmentCount, PathStringComparison comparison)
+    public bool Match(ReadOnlySpan<char> path, bool isDirectory, int segmentCount, PathStringComparison comparison, Ignore.IgnoreMatcherEvaluator? evaluator = null)
     {
         return Kind switch
         {
@@ -51,25 +53,44 @@ internal sealed class GlobCompiledPattern
             GlobPatternKind.Suffix => segmentCount == 1 && comparison.EndsWith(path, SuffixText!),
             GlobPatternKind.MatchAll => segmentCount == 1,
             GlobPatternKind.RecursiveMatchAll => true,
-            _ => MatchGeneral(path, segmentCount, comparison),
+            _ => MatchGeneral(path, segmentCount, comparison, evaluator),
         };
     }
 
     public bool MatchGeneralOnly(NormalizedPath path, PathStringComparison comparison)
     {
-        return MatchGeneral(path.Value.AsSpan(), path.SegmentCount, comparison);
+        return MatchGeneral(path.Value.AsSpan(), path.SegmentCount, comparison, evaluator: null);
     }
 
     public string GetDebugView() => $"{Kind}: {string.Join("/", Segments.Select(static x => x.RawText))}";
 
-    private bool MatchGeneral(ReadOnlySpan<char> path, int segmentCount, PathStringComparison comparison)
+    private bool MatchGeneral(ReadOnlySpan<char> path, int segmentCount, PathStringComparison comparison, Ignore.IgnoreMatcherEvaluator? evaluator)
     {
-        Span<SegmentRange> segmentRanges = segmentCount <= 32
-            ? stackalloc SegmentRange[segmentCount]
-            : new SegmentRange[segmentCount];
+        if (segmentCount <= 32)
+        {
+            Span<SegmentRange> segmentRanges = stackalloc SegmentRange[segmentCount];
+            FillPathSegments(path, segmentRanges);
+            return MatchSegments(path, segmentRanges, 0, 0, comparison);
+        }
 
-        FillPathSegments(path, segmentRanges);
-        return MatchSegments(path, segmentRanges, 0, 0, comparison);
+        if (evaluator is not null)
+        {
+            var segmentRanges = evaluator.GetSegmentBuffer(segmentCount);
+            FillPathSegments(path, segmentRanges);
+            return MatchSegments(path, segmentRanges, 0, 0, comparison);
+        }
+
+        var rentedBuffer = ArrayPool<SegmentRange>.Shared.Rent(segmentCount);
+        try
+        {
+            var segmentRanges = rentedBuffer.AsSpan(0, segmentCount);
+            FillPathSegments(path, segmentRanges);
+            return MatchSegments(path, segmentRanges, 0, 0, comparison);
+        }
+        finally
+        {
+            ArrayPool<SegmentRange>.Shared.Return(rentedBuffer);
+        }
     }
 
     private bool MatchSegments(ReadOnlySpan<char> path, ReadOnlySpan<SegmentRange> segmentRanges, int patternIndex, int segmentIndex, PathStringComparison comparison)

@@ -9,9 +9,9 @@ namespace XenoAtom.Glob.Internal;
 internal static class IgnoreRuleMatcher
 {
     public static bool IsMatch(IgnoreRule rule, string candidatePath, int candidateLength, bool isDirectory, PathStringComparison comparison)
-        => IsMatch(rule, candidatePath.AsSpan(0, candidateLength), isDirectory, comparison);
+        => IsMatch(rule, candidatePath.AsSpan(0, candidateLength), isDirectory, comparison, evaluator: null);
 
-    public static bool IsMatch(IgnoreRule rule, ReadOnlySpan<char> candidatePath, bool isDirectory, PathStringComparison comparison)
+    public static bool IsMatch(IgnoreRule rule, ReadOnlySpan<char> candidatePath, bool isDirectory, PathStringComparison comparison, IgnoreMatcherEvaluator? evaluator = null)
     {
         if (!TryGetRelativePathRange(rule.BaseDirectory, candidatePath, comparison, out var relativeStart, out var relativeLength))
         {
@@ -38,7 +38,7 @@ internal static class IgnoreRuleMatcher
                 return false;
             }
 
-            return rule.CompiledPattern.Match(finalSegment, isDirectory, segmentCount: 1, comparison);
+            return rule.CompiledPattern.Match(finalSegment, isDirectory, segmentCount: 1, comparison, evaluator);
         }
 
         var matchedSegmentCount = 0;
@@ -56,7 +56,7 @@ internal static class IgnoreRuleMatcher
                 continue;
             }
 
-            if (rule.CompiledPattern.Match(relativePath[..index], prefixIsDirectory, matchedSegmentCount, comparison))
+            if (rule.CompiledPattern.Match(relativePath[..index], prefixIsDirectory, matchedSegmentCount, comparison, evaluator))
             {
                 return true;
             }

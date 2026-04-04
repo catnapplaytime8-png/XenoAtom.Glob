@@ -24,6 +24,13 @@ public class PublicApiGuardTests
     }
 
     [TestMethod]
+    public void IgnoreMatcherEvaluator_Evaluate_ShouldThrowOnNull()
+    {
+        using var evaluator = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("*.tmp")).CreateEvaluator();
+        Assert.Throws<ArgumentNullException>(() => evaluator.Evaluate((string)null!));
+    }
+
+    [TestMethod]
     public void RepositoryDiscovery_Discover_ShouldThrowOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => RepositoryDiscovery.Discover(null!));

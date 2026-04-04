@@ -50,6 +50,12 @@ public sealed class IgnoreMatcher
     }
 
     /// <summary>
+    /// Creates a reusable evaluator that amortizes temporary buffer usage across repeated evaluations.
+    /// </summary>
+    /// <returns>A reusable evaluator bound to this matcher.</returns>
+    public IgnoreMatcherEvaluator CreateEvaluator() => new(this);
+
+    /// <summary>
     /// Evaluates ignore rules for the specified relative path.
     /// </summary>
     /// <param name="path">The relative path to evaluate.</param>
@@ -89,7 +95,7 @@ public sealed class IgnoreMatcher
                 throw new ArgumentException(GetPathErrorMessage(error), nameof(path));
             }
 
-            return EvaluateNormalized(normalizedPath, normalizedIsDirectory);
+            return EvaluateNormalized(normalizedPath, normalizedIsDirectory, evaluator: null);
         }
         finally
         {
@@ -108,6 +114,9 @@ public sealed class IgnoreMatcher
     };
 
     internal IgnoreEvaluationResult EvaluateNormalized(ReadOnlySpan<char> normalizedPath, bool isDirectory)
+        => EvaluateNormalized(normalizedPath, isDirectory, evaluator: null);
+
+    internal IgnoreEvaluationResult EvaluateNormalized(ReadOnlySpan<char> normalizedPath, bool isDirectory, IgnoreMatcherEvaluator? evaluator)
     {
         for (var index = 0; index < normalizedPath.Length; index++)
         {
@@ -116,14 +125,14 @@ public sealed class IgnoreMatcher
                 continue;
             }
 
-            var directoryDecision = EvaluateSinglePath(normalizedPath[..index], isDirectory: true, trace: null);
+            var directoryDecision = EvaluateSinglePath(normalizedPath[..index], isDirectory: true, trace: null, evaluator);
             if (directoryDecision.IsMatch && directoryDecision.IsIgnored)
             {
                 return directoryDecision;
             }
         }
 
-        return EvaluateSinglePath(normalizedPath, isDirectory, trace: null);
+        return EvaluateSinglePath(normalizedPath, isDirectory, trace: null, evaluator);
     }
 
     internal IgnoreEvaluationResult Evaluate(NormalizedPath normalizedPath)
@@ -153,24 +162,24 @@ public sealed class IgnoreMatcher
                 continue;
             }
 
-            var directoryDecision = EvaluateSinglePath(path[..index], isDirectory: true, trace);
+            var directoryDecision = EvaluateSinglePath(path[..index], isDirectory: true, trace, evaluator: null);
             if (directoryDecision.IsMatch && directoryDecision.IsIgnored)
             {
                 return new IgnoreEvaluationTrace(directoryDecision, trace ?? []);
             }
         }
 
-        return new IgnoreEvaluationTrace(EvaluateSinglePath(path, normalizedPath.IsDirectory, trace), trace ?? []);
+        return new IgnoreEvaluationTrace(EvaluateSinglePath(path, normalizedPath.IsDirectory, trace, evaluator: null), trace ?? []);
     }
 
-    private IgnoreEvaluationResult EvaluateSinglePath(ReadOnlySpan<char> candidatePath, bool isDirectory, List<IgnoreRule>? trace)
+    private IgnoreEvaluationResult EvaluateSinglePath(ReadOnlySpan<char> candidatePath, bool isDirectory, List<IgnoreRule>? trace, IgnoreMatcherEvaluator? evaluator)
     {
         IgnoreRule? winningRule = null;
         var ignored = false;
 
         for (var ruleSetIndex = 0; ruleSetIndex < _indexedRuleSets.Length; ruleSetIndex++)
         {
-            EvaluateRuleSet(_indexedRuleSets[ruleSetIndex], candidatePath, isDirectory, trace, ref winningRule, ref ignored);
+            EvaluateRuleSet(_indexedRuleSets[ruleSetIndex], candidatePath, isDirectory, trace, evaluator, ref winningRule, ref ignored);
         }
 
         return winningRule is null
@@ -183,6 +192,7 @@ public sealed class IgnoreMatcher
         ReadOnlySpan<char> candidatePath,
         bool isDirectory,
         List<IgnoreRule>? trace,
+        IgnoreMatcherEvaluator? evaluator,
         ref IgnoreRule? winningRule,
         ref bool ignored)
     {
@@ -191,7 +201,7 @@ public sealed class IgnoreMatcher
             for (var ruleIndex = 0; ruleIndex < indexedRuleSet.Rules.Count; ruleIndex++)
             {
                 var rule = indexedRuleSet.Rules[ruleIndex];
-                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, _comparison))
+                if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, _comparison, evaluator))
                 {
                     continue;
                 }
@@ -258,7 +268,7 @@ public sealed class IgnoreMatcher
 
             previousRuleIndex = nextRuleIndex;
             var rule = indexedRuleSet.Rules[nextRuleIndex];
-            if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, _comparison))
+            if (!IgnoreRuleMatcher.IsMatch(rule, candidatePath, isDirectory, _comparison, evaluator))
             {
                 continue;
             }

@@ -13,6 +13,7 @@ public class RepositoryTraversalBenchmarks
     private string _repositoryRoot = null!;
     private string[] _repositoryFiles = null!;
     private IgnoreMatcher _matcher = null!;
+    private IgnoreMatcherEvaluator _evaluator = null!;
     private Repository _libGitRepository = null!;
 
     [GlobalSetup]
@@ -21,6 +22,7 @@ public class RepositoryTraversalBenchmarks
         _repositoryRoot = FindRepositoryRoot();
         _repositoryFiles = CollectRepositoryFiles(_repositoryRoot).ToArray();
         _matcher = BuildMatcherFromRepository(_repositoryRoot);
+        _evaluator = _matcher.CreateEvaluator();
         _libGitRepository = new Repository(_repositoryRoot);
 
         var xenoCount = MatchCollectedRepositoryFilesWithGitIgnore();
@@ -38,7 +40,7 @@ public class RepositoryTraversalBenchmarks
         var count = 0;
         foreach (var path in _repositoryFiles)
         {
-            if (!_matcher.Evaluate(path).IsIgnored)
+            if (!_evaluator.Evaluate(path).IsIgnored)
             {
                 count++;
             }
@@ -63,7 +65,11 @@ public class RepositoryTraversalBenchmarks
     }
 
     [GlobalCleanup]
-    public void Cleanup() => _libGitRepository.Dispose();
+    public void Cleanup()
+    {
+        _evaluator.Dispose();
+        _libGitRepository.Dispose();
+    }
 
     private static IgnoreMatcher BuildMatcherFromRepository(string repositoryRoot)
     {

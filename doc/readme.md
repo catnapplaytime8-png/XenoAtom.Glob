@@ -46,6 +46,9 @@ var result = matcher.Evaluate("build/output.tmp");
 
 ReadOnlySpan<char> spanCandidate = @"build\output.tmp";
 var spanResult = matcher.Evaluate(spanCandidate);
+
+using var evaluator = matcher.CreateEvaluator();
+var hotPathResult = evaluator.Evaluate("build/output.tmp");
 ```
 
 Later rule sets passed to `IgnoreMatcher` have higher precedence than earlier ones.
@@ -56,6 +59,8 @@ For hot-path callers that already work with spans, the public APIs also accept `
 - `IgnoreMatcher.Evaluate(ReadOnlySpan<char>, bool)`
 - `IgnoreRuleSet.ParseGitIgnore(ReadOnlySpan<char>, ...)`
 - `IgnoreRuleSet.Parse(ReadOnlySpan<char>, IgnoreDialect, ...)`
+
+For repeated ignore checks on hot paths, `IgnoreMatcher.CreateEvaluator()` returns a reusable evaluator that retains pooled normalization and matcher scratch buffers across calls instead of rebuilding them on each evaluation.
 
 For explicit dialect selection:
 
@@ -132,7 +137,7 @@ The repository includes `src/XenoAtom.Glob.Benchmarks/` with BenchmarkDotNet ben
 - single-path glob matching
 - ignore evaluation
 - traversal with and without ignore pruning
-- traversal of the current repository root using the real `.gitignore` stack
-- comparison against `LibGit2Sharp.Ignore.IsPathIgnored` on the same repository traversal shape
+- matching of a pre-collected current-repository file list using the real `.gitignore` stack
+- comparison against `LibGit2Sharp.Ignore.IsPathIgnored` on the same pre-collected repository inputs
 
 The latest recorded benchmark notes are available in [benchmarks/latest.md](./benchmarks/latest.md).
