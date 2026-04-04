@@ -151,8 +151,8 @@ public class RepositoryDiscoveryTests
         var gitDir = git.RunChecked("-C", tempDirectory.GetPath("src", "nested"), "rev-parse", "--git-dir").StandardOutput.Trim();
         var resolvedGitDir = Path.GetFullPath(Path.Combine(tempDirectory.GetPath("src", "nested"), gitDir));
 
-        Assert.AreEqual(Path.GetFullPath(topLevel), context.WorkingTreeRoot);
-        Assert.AreEqual(Path.GetFullPath(resolvedGitDir), context.GitDirectory);
+        AssertEquivalentPath(topLevel, context.WorkingTreeRoot);
+        AssertEquivalentPath(resolvedGitDir, context.GitDirectory);
     }
 
     [TestMethod]
@@ -177,5 +177,26 @@ public class RepositoryDiscoveryTests
 
         Assert.AreEqual(Path.GetFullPath(tempDirectory.GetPath("submodule")), context.WorkingTreeRoot);
         Assert.AreEqual(Path.GetFullPath(tempDirectory.GetPath(".git", "modules", "submodule")), context.GitDirectory);
+    }
+
+    private static void AssertEquivalentPath(string expected, string actual)
+    {
+        Assert.AreEqual(NormalizePathForComparison(expected), NormalizePathForComparison(actual));
+    }
+
+    private static string NormalizePathForComparison(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (OperatingSystem.IsMacOS() &&
+            fullPath.StartsWith("/private/", StringComparison.Ordinal))
+        {
+            var withoutPrivatePrefix = fullPath["/private".Length..];
+            if (Path.Exists(withoutPrivatePrefix))
+            {
+                return withoutPrivatePrefix;
+            }
+        }
+
+        return fullPath;
     }
 }
