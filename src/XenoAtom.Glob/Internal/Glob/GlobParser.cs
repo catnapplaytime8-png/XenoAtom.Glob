@@ -227,13 +227,44 @@ internal static class GlobParser
                 prefixText = segment.Tokens[0].Literal;
             }
         }
-        else if (segments.Length > 1 && segments.All(static x => x.IsLiteral))
+        else if (segments.Length > 1 && TryCreateExactTextFromLiteralSegments(segments, out var literalPath))
         {
             kind = GlobPatternKind.Exact;
-            exactText = string.Join("/", segments.Select(static x => x.LiteralText));
+            exactText = literalPath;
         }
 
         return new GlobCompiledPattern(segments, hasLeadingSeparator, hasTrailingSeparator, kind, exactText, prefixText, suffixText);
+    }
+
+    private static bool TryCreateExactTextFromLiteralSegments(GlobCompiledSegment[] segments, out string? exactText)
+    {
+        var totalLength = 0;
+        for (var index = 0; index < segments.Length; index++)
+        {
+            var segment = segments[index];
+            if (!segment.IsLiteral)
+            {
+                exactText = null;
+                return false;
+            }
+
+            totalLength += segment.LiteralText!.Length;
+        }
+
+        totalLength += segments.Length - 1;
+        var builder = new StringBuilder(totalLength);
+        for (var index = 0; index < segments.Length; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append('/');
+            }
+
+            builder.Append(segments[index].LiteralText);
+        }
+
+        exactText = builder.ToString();
+        return true;
     }
 
     private static void FlushLiteral(List<GlobToken> tokens, StringBuilder literalBuilder)

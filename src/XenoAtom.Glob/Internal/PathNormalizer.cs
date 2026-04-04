@@ -35,7 +35,7 @@ internal static class PathNormalizer
         var inferredDirectory = isDirectory || EndsWithSeparator(path);
         if (path.Length == 0)
         {
-            return PathNormalizationResult.FromPath(new NormalizedPath(string.Empty, inferredDirectory));
+            return PathNormalizationResult.FromPath(new NormalizedPath(string.Empty, inferredDirectory, segmentCount: 0));
         }
 
         if (TryReturnUnchangedPath(path, inferredDirectory, out var unchangedResult))
@@ -95,7 +95,7 @@ internal static class PathNormalizer
             }
 
             var normalizedValue = written == 0 ? string.Empty : new string(destination[..written]);
-            return PathNormalizationResult.FromPath(new NormalizedPath(normalizedValue, inferredDirectory));
+            return PathNormalizationResult.FromPath(new NormalizedPath(normalizedValue, inferredDirectory, CountSegments(normalizedValue)));
         }
         finally
         {
@@ -151,8 +151,27 @@ internal static class PathNormalizer
             segmentLength = 0;
         }
 
-        result = PathNormalizationResult.FromPath(new NormalizedPath(path, inferredDirectory));
+        result = PathNormalizationResult.FromPath(new NormalizedPath(path, inferredDirectory, CountSegments(path)));
         return true;
+    }
+
+    private static int CountSegments(ReadOnlySpan<char> path)
+    {
+        if (path.Length == 0)
+        {
+            return 0;
+        }
+
+        var count = 1;
+        for (var index = 0; index < path.Length; index++)
+        {
+            if (path[index] == '/')
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static string GetErrorMessage(PathNormalizationError error) => error switch

@@ -2,15 +2,47 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using System.Text;
+
 namespace XenoAtom.Glob.Internal;
 
 internal sealed class GlobCompiledSegment
 {
+    private readonly bool _isLiteral;
+    private readonly string? _literalText;
+
     public GlobCompiledSegment(string rawText, GlobToken[] tokens, bool isRecursiveWildcard)
     {
         RawText = rawText;
         Tokens = tokens;
         IsRecursiveWildcard = isRecursiveWildcard;
+
+        var totalLiteralLength = 0;
+        _isLiteral = !isRecursiveWildcard;
+        if (_isLiteral)
+        {
+            for (var index = 0; index < tokens.Length; index++)
+            {
+                var token = tokens[index];
+                if (token.Kind != GlobTokenKind.Literal)
+                {
+                    _isLiteral = false;
+                    break;
+                }
+
+                totalLiteralLength += token.Literal!.Length;
+            }
+        }
+
+        if (_isLiteral)
+        {
+            _literalText = tokens.Length switch
+            {
+                0 => string.Empty,
+                1 => tokens[0].Literal,
+                _ => CreateLiteralText(tokens, totalLiteralLength),
+            };
+        }
     }
 
     public string RawText { get; }
@@ -19,9 +51,9 @@ internal sealed class GlobCompiledSegment
 
     public bool IsRecursiveWildcard { get; }
 
-    public bool IsLiteral => !IsRecursiveWildcard && Tokens.All(static x => x.Kind == GlobTokenKind.Literal);
+    public bool IsLiteral => _isLiteral;
 
-    public string? LiteralText => IsLiteral ? string.Concat(Tokens.Select(static x => x.Literal)) : null;
+    public string? LiteralText => _literalText;
 
     public bool IsMatch(ReadOnlySpan<char> value, PathStringComparison comparison)
     {
@@ -86,5 +118,16 @@ internal sealed class GlobCompiledSegment
         }
 
         return tokenIndex == Tokens.Length;
+    }
+
+    private static string CreateLiteralText(GlobToken[] tokens, int totalLength)
+    {
+        var builder = new StringBuilder(totalLength);
+        for (var index = 0; index < tokens.Length; index++)
+        {
+            builder.Append(tokens[index].Literal);
+        }
+
+        return builder.ToString();
     }
 }

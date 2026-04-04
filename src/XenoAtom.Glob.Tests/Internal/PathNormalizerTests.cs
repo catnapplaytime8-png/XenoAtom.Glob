@@ -71,6 +71,20 @@ public class PathNormalizerTests
     }
 
     [TestMethod]
+    [DataRow("src/nested/file.txt", false, 3, false)]
+    [DataRow(@"src\nested\file.txt", false, 3, false)]
+    [DataRow("./src/./nested/file.txt", false, 3, false)]
+    [DataRow("src/folder/", false, 2, true)]
+    [DataRow("", false, 0, false)]
+    public void SegmentCount_ShouldBePreservedAcrossFastAndSlowNormalizationPaths(string path, bool isDirectory, int expectedSegmentCount, bool expectedDirectory)
+    {
+        var normalized = PathNormalizer.NormalizeRelativePath(path, isDirectory);
+
+        Assert.AreEqual(expectedSegmentCount, normalized.SegmentCount);
+        Assert.AreEqual(expectedDirectory, normalized.IsDirectory);
+    }
+
+    [TestMethod]
     [DataRow("src/file.txt")]
     [DataRow("src/folder/")]
     [DataRow(@"src\folder\child.txt")]

@@ -4,31 +4,22 @@
 
 namespace XenoAtom.Glob.Internal;
 
-internal readonly record struct NormalizedPath(string Value, bool IsDirectory)
+internal readonly record struct NormalizedPath
 {
-    public bool IsEmpty => Value.Length == 0;
-
-    public int SegmentCount
+    public NormalizedPath(string value, bool isDirectory, int segmentCount)
     {
-        get
-        {
-            if (Value.Length == 0)
-            {
-                return 0;
-            }
-
-            var count = 1;
-            foreach (var c in Value)
-            {
-                if (c == '/')
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
+        Value = value;
+        IsDirectory = isDirectory;
+        SegmentCount = segmentCount;
     }
+
+    public string Value { get; }
+
+    public bool IsDirectory { get; }
+
+    public int SegmentCount { get; }
+
+    public bool IsEmpty => Value.Length == 0;
 
     public PathSegmentEnumerator EnumerateSegments() => new(Value);
 
