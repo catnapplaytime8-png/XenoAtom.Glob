@@ -8,6 +8,9 @@ namespace XenoAtom.Glob.Benchmarks;
 public class PathBenchmarks
 {
     [Benchmark]
+    public string NormalizeAlreadyNormalizedPath() => PathNormalizer.NormalizeRelativePath("src/generated/nested/file.txt").Value;
+
+    [Benchmark]
     public string NormalizeWindowsStylePath() => PathNormalizer.NormalizeRelativePath(@"src\generated\\nested\file.txt").Value;
 
     [Benchmark]

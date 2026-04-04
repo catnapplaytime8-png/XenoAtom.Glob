@@ -108,6 +108,9 @@ public class TraversalBenchmarks
     [Benchmark]
     public int EnumerateWithoutIgnoreRules() => _walker.Enumerate(_fixture.RootPath, _noIgnoreOptions).Count();
 
+    [Benchmark(Baseline = true)]
+    public int EnumerateWithoutIgnoreRulesWithRawRecursiveRuntimeEnumerator() => CountFilesRawRecursively(_fixture.RootPath);
+
     [Benchmark]
     public int EnumerateWithShallowIgnoreRules() => _walker.Enumerate(_fixture.RootPath, _shallowIgnoreOptions).Count();
 
@@ -120,9 +123,6 @@ public class TraversalBenchmarks
     [Benchmark]
     public int EnumerateWhereAllRootEntriesAreSkipped() => _walker.Enumerate(_skippedFixture.RootPath, _skippedOptions).Count();
 
-    [Benchmark]
-    public int EnumerateRootEntriesWithRawRuntimeEnumerator() => CountRootEntriesRaw(_skippedFixture.RootPath);
-
     [GlobalCleanup]
     public void Cleanup()
     {
@@ -132,19 +132,34 @@ public class TraversalBenchmarks
         _skippedFixture.Dispose();
     }
 
-    private static int CountRootEntriesRaw(string directoryPath)
+    private static int CountFilesRawRecursively(string directoryPath)
     {
-        using var enumerator = new RawCountingEnumerator(directoryPath);
         var count = 0;
-        while (enumerator.MoveNext())
+        var directories = new Stack<string>();
+        directories.Push(directoryPath);
+
+        while (directories.Count > 0)
         {
-            count++;
+            using var enumerator = new RawCountingEnumerator(directories.Pop());
+            while (enumerator.MoveNext())
+            {
+                var current = enumerator.Current;
+                if (current.IsDirectory)
+                {
+                    directories.Push(current.FullPath);
+                    continue;
+                }
+
+                count++;
+            }
         }
 
         return count;
     }
 
-    private sealed class RawCountingEnumerator : FileSystemEnumerator<int>
+    private readonly record struct RawEntry(string FullPath, bool IsDirectory);
+
+    private sealed class RawCountingEnumerator : FileSystemEnumerator<RawEntry>
     {
         private static readonly EnumerationOptions Options = new()
         {
@@ -158,8 +173,10 @@ public class TraversalBenchmarks
         {
         }
 
-        protected override bool ShouldIncludeEntry(ref FileSystemEntry entry) => true;
+        protected override bool ShouldIncludeEntry(ref FileSystemEntry entry)
+            => (entry.Attributes & FileAttributes.ReparsePoint) == 0;
 
-        protected override int TransformEntry(ref FileSystemEntry entry) => 0;
+        protected override RawEntry TransformEntry(ref FileSystemEntry entry)
+            => new(entry.ToFullPath(), entry.IsDirectory);
     }
 }
