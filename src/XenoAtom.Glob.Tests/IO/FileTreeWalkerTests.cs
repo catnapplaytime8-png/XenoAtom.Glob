@@ -2,6 +2,9 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using LibGit2Sharp;
+using GitIgnore = LibGit2Sharp.Ignore;
+
 using XenoAtom.Glob.Git;
 using XenoAtom.Glob.IO;
 using XenoAtom.Glob.Tests.TestInfrastructure;
@@ -149,6 +152,26 @@ public class FileTreeWalkerTests
             .ToArray();
 
         CollectionAssert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldMatchLibGit2SharpVisibleFilesForCurrentRepository()
+    {
+        var repositoryRoot = FindCurrentRepositoryRoot();
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(repositoryRoot);
+        var actual = walker.Enumerate(repositoryRoot, new FileTreeWalkOptions { RepositoryContext = context })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        using var repository = new Repository(repositoryRoot);
+        var expected = EnumerateVisibleFilesWithLibGit2Sharp(repositoryRoot, repository.Ignore)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(expected, actual, BuildPathMismatchMessage(expected, actual));
     }
 
     [TestMethod]
@@ -406,5 +429,77 @@ public class FileTreeWalkerTests
     {
         var delta = (expected - actual).Duration();
         Assert.IsTrue(delta <= TimeSpan.FromSeconds(1), $"Expected timestamp {expected:O} to be within one second of {actual:O}.");
+    }
+
+    private static IEnumerable<string> EnumerateVisibleFilesWithLibGit2Sharp(string repositoryRoot, GitIgnore ignore)
+    {
+        var stack = new Stack<(string FullPath, string RelativePath)>();
+        stack.Push((repositoryRoot, string.Empty));
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            foreach (var path in Directory.EnumerateFileSystemEntries(current.FullPath))
+            {
+                var name = Path.GetFileName(path);
+                if (string.Equals(name, ".git", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    continue;
+                }
+
+                var isDirectory = (attributes & FileAttributes.Directory) != 0;
+                var relativePath = current.RelativePath.Length == 0 ? name : $"{current.RelativePath}/{name}";
+                var ignorePath = isDirectory ? $"{relativePath}/" : relativePath;
+                if (ignore.IsPathIgnored(ignorePath))
+                {
+                    continue;
+                }
+
+                if (isDirectory)
+                {
+                    stack.Push((path, relativePath));
+                    continue;
+                }
+
+                yield return relativePath;
+            }
+        }
+    }
+
+    private static string FindCurrentRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, ".git")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        Assert.Inconclusive($"Unable to locate the repository root from '{AppContext.BaseDirectory}'.");
+        return string.Empty;
+    }
+
+    private static string BuildPathMismatchMessage(IReadOnlyList<string> expected, IReadOnlyList<string> actual)
+    {
+        var onlyExpected = expected.Except(actual, StringComparer.Ordinal).Take(20).ToArray();
+        var onlyActual = actual.Except(expected, StringComparer.Ordinal).Take(20).ToArray();
+
+        return $"""
+            Visible file sets diverged between XenoAtom.Glob and LibGit2Sharp.
+            Expected count: {expected.Count}
+            Actual count: {actual.Count}
+            Only in expected: [{string.Join(", ", onlyExpected)}]
+            Only in actual: [{string.Join(", ", onlyActual)}]
+            """;
     }
 }
