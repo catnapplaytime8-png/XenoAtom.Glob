@@ -55,6 +55,60 @@ public class RepositoryDiscoveryTests
     }
 
     [TestMethod]
+    public void Discover_ShouldResolveQuotedCoreExcludesFileAfterSubsectionEntries()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        var globalIgnorePath = tempDirectory.GetPath("global ignore.txt");
+        File.WriteAllText(globalIgnorePath, "*.cache\n");
+        var escapedPath = globalIgnorePath.Replace("\\", "\\\\", StringComparison.Ordinal);
+        File.AppendAllText(
+            tempDirectory.GetPath(".git", "config"),
+            $"[includeIf \"gitdir:~/work/\"]{Environment.NewLine}\tpath = ignored.cfg{Environment.NewLine}[core]{Environment.NewLine}\texcludesFile = \"{escapedPath}\"{Environment.NewLine}");
+
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+
+        Assert.AreEqual(Path.GetFullPath(globalIgnorePath), context.GlobalExcludePath);
+    }
+
+    [TestMethod]
+    public void Discover_ShouldExpandHomeInCoreExcludesFile()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.IsFalse(string.IsNullOrEmpty(home));
+
+        var uniqueSegment = $".xenoatom-glob-tests/{Guid.NewGuid():N}/global ignore.txt";
+        var fullGlobalIgnorePath = Path.Combine(home, uniqueSegment.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullGlobalIgnorePath)!);
+
+        try
+        {
+            File.WriteAllText(fullGlobalIgnorePath, "*.cache\n");
+            File.AppendAllText(
+                tempDirectory.GetPath(".git", "config"),
+                $"[core]{Environment.NewLine}\texcludesFile = \"~/{uniqueSegment}\"{Environment.NewLine}");
+
+            var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+
+            Assert.AreEqual(Path.GetFullPath(fullGlobalIgnorePath), context.GlobalExcludePath);
+        }
+        finally
+        {
+            var directory = Path.GetDirectoryName(fullGlobalIgnorePath)!;
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
     public void Discover_ShouldResolveCoreIgnoreCaseFromConfig()
     {
         using var tempDirectory = new TemporaryDirectory();

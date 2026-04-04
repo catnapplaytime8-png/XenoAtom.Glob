@@ -190,6 +190,13 @@ public class GitIgnoreDifferentialTests
     }
 
     [TestMethod]
+    public void GitDifferential_ShouldMatchCharacterClassesWhenCoreIgnoreCaseChanges()
+    {
+        AssertCharacterClassScenario(ignoreCase: false, "character-classes-case-sensitive");
+        AssertCharacterClassScenario(ignoreCase: true, "character-classes-case-insensitive");
+    }
+
+    [TestMethod]
     public void GitDifferential_ShouldMatchGeneratedRuleOrderingAndNegationScenarios()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -330,6 +337,27 @@ public class GitIgnoreDifferentialTests
 
         var matcher = BuildMatcherFromRepository(tempDirectory);
         var paths = new[] { "file.txt", "file.TXT" };
+        var gitResults = QueryGit(git, paths);
+        foreach (var path in paths)
+        {
+            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, scenarioName);
+        }
+    }
+
+    private static void AssertCharacterClassScenario(bool ignoreCase, string scenarioName)
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        git.RunChecked("config", "core.ignorecase", ignoreCase ? "true" : "false");
+        tempDirectory.WriteAllText(".gitignore", """
+            [A-Z].txt
+            [a-z].cs
+            [!A-Z].bin
+            """);
+
+        var matcher = BuildMatcherFromRepository(tempDirectory);
+        var paths = new[] { "a.txt", "A.txt", "a.cs", "A.cs", "a.bin", "A.bin", "1.bin" };
         var gitResults = QueryGit(git, paths);
         foreach (var path in paths)
         {

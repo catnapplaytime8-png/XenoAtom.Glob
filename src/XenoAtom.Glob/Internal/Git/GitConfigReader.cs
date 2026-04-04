@@ -92,7 +92,7 @@ internal static class GitConfigReader
 
             if (line.StartsWith('[') && line.EndsWith(']'))
             {
-                currentSection = line[1..^1].Trim();
+                currentSection = TryParseSectionName(line);
                 continue;
             }
 
@@ -113,10 +113,57 @@ internal static class GitConfigReader
                 continue;
             }
 
-            return line[(separatorIndex + 1)..].Trim();
+            return ParseValue(line[(separatorIndex + 1)..].Trim());
         }
 
         return null;
+    }
+
+    private static string? TryParseSectionName(string line)
+    {
+        var section = line[1..^1].Trim();
+        if (section.Length == 0)
+        {
+            return null;
+        }
+
+        var quoteIndex = section.IndexOf('"');
+        var separatorIndex = section.IndexOfAny(' ', '\t');
+        var endIndex = quoteIndex >= 0 && separatorIndex >= 0
+            ? Math.Min(quoteIndex, separatorIndex)
+            : Math.Max(quoteIndex, separatorIndex);
+
+        return endIndex > 0 ? section[..endIndex] : section;
+    }
+
+    private static string ParseValue(string value)
+    {
+        if (value.Length < 2 || value[0] != '"' || value[^1] != '"')
+        {
+            return value;
+        }
+
+        var content = value[1..^1];
+        if (content.IndexOf('\\') < 0)
+        {
+            return content;
+        }
+
+        var buffer = new char[content.Length];
+        var written = 0;
+        for (var index = 0; index < content.Length; index++)
+        {
+            var current = content[index];
+            if (current == '\\' && index + 1 < content.Length)
+            {
+                buffer[written++] = content[++index];
+                continue;
+            }
+
+            buffer[written++] = current;
+        }
+
+        return new string(buffer, 0, written);
     }
 
     private static string ExpandAndResolvePath(string path, string baseDirectory)

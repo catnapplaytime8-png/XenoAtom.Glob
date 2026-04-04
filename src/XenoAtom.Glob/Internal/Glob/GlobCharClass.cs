@@ -16,12 +16,12 @@ internal sealed class GlobCharClass
 
     public GlobCharClassRange[] Ranges { get; }
 
-    public bool IsMatch(char value)
+    public bool IsMatch(char value, PathStringComparison comparison)
     {
         var matched = false;
         foreach (var range in Ranges)
         {
-            if (range.Contains(value))
+            if (range.Contains(value, comparison))
             {
                 matched = true;
                 break;

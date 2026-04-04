@@ -72,13 +72,14 @@ The implementation supports:
 - a normal `.git` directory
 - a `.git` gitfile that points to another Git directory
 - `.git/info/exclude`
-- `core.excludesFile`
+- `core.excludesFile`, including quoted values and `~/` expansion
 - repository-aware case comparison through `core.ignorecase`
 
 Current repository-aware scope:
 
 - ignore evaluation answers whether a path would be ignored by the ignore engine
 - tracked-file state from the Git index is intentionally out of scope for this release
+- repository discovery reads the directly available `[core]` values from the discovered config files; `include` or `includeIf` indirection and line continuations are not interpreted yet
 
 ## Tree Walking
 

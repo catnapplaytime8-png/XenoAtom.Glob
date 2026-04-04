@@ -2,6 +2,8 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+using XenoAtom.Glob.Internal;
+
 namespace XenoAtom.Glob.Tests;
 
 [TestClass]
@@ -35,6 +37,61 @@ public class GlobPatternTests
         var pattern = GlobPattern.Parse(patternText);
 
         Assert.AreEqual(expected, pattern.IsMatch(path));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldHandleEmptyPattern()
+    {
+        var pattern = GlobPattern.Parse(string.Empty);
+
+        Assert.IsTrue(pattern.IsMatch(string.Empty));
+        Assert.IsFalse(pattern.IsMatch("file.txt"));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldHandleBareStar()
+    {
+        var pattern = GlobPattern.Parse("*");
+
+        Assert.IsTrue(pattern.IsMatch("file.txt"));
+        Assert.IsFalse(pattern.IsMatch("src/file.txt"));
+        Assert.IsFalse(pattern.IsMatch(string.Empty));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldCollapseConsecutiveRecursiveWildcards()
+    {
+        var pattern = GlobPattern.Parse("src/**/**/file.txt");
+
+        Assert.IsTrue(pattern.IsMatch("src/file.txt"));
+        Assert.IsTrue(pattern.IsMatch("src/nested/deep/file.txt"));
+        Assert.IsFalse(pattern.IsMatch("other/file.txt"));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldHonorEscapedCharacterClassLiterals()
+    {
+        Assert.IsTrue(GlobPattern.Parse(@"file[\]].txt").IsMatch("file].txt"));
+        Assert.IsFalse(GlobPattern.Parse(@"file[\]].txt").IsMatch("filea.txt"));
+        Assert.IsTrue(GlobPattern.Parse(@"file[\-].txt").IsMatch("file-.txt"));
+        Assert.IsFalse(GlobPattern.Parse(@"file[\-].txt").IsMatch("filea.txt"));
+    }
+
+    [TestMethod]
+    public void Match_ShouldFoldCharacterClassesWhenComparisonIsIgnoreCase()
+    {
+        var upper = GlobParser.TryParse("[A-Z].txt", GlobParserOptions.IgnorePattern);
+        var lower = GlobParser.TryParse("[a-z].cs", GlobParserOptions.IgnorePattern);
+        var negated = GlobParser.TryParse("[!A-Z].bin", GlobParserOptions.IgnorePattern);
+
+        Assert.IsTrue(upper.Success);
+        Assert.IsTrue(lower.Success);
+        Assert.IsTrue(negated.Success);
+
+        Assert.IsTrue(upper.Pattern.Match(PathNormalizer.NormalizeRelativePath("a.txt"), PathStringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(lower.Pattern.Match(PathNormalizer.NormalizeRelativePath("A.cs"), PathStringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(negated.Pattern.Match(PathNormalizer.NormalizeRelativePath("a.bin"), PathStringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(negated.Pattern.Match(PathNormalizer.NormalizeRelativePath("1.bin"), PathStringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]

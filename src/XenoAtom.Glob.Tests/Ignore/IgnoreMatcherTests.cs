@@ -135,6 +135,31 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void Parse_ShouldSupportReadOnlySpanOverload()
+    {
+        ReadOnlySpan<char> content = """
+            *.tmp
+            !keep.tmp
+            """;
+
+        var ruleSet = IgnoreRuleSet.Parse(
+            content,
+            IgnoreDialect.GitIgnore,
+            sourcePath: ".gitignore",
+            sourceKind: IgnoreRuleSourceKind.PerDirectory);
+        var matcher = new IgnoreMatcher(ruleSet);
+
+        var ignored = matcher.Evaluate("file.tmp");
+        var included = matcher.Evaluate("keep.tmp");
+
+        Assert.AreEqual(2, ruleSet.Rules.Count);
+        Assert.IsTrue(ignored.IsIgnored);
+        Assert.IsTrue(included.IsMatch);
+        Assert.IsFalse(included.IsIgnored);
+        Assert.AreEqual("!keep.tmp", included.Rule!.RawPatternText);
+    }
+
+    [TestMethod]
     public void ParseGitIgnore_ShouldRejectInvalidTrailingEscape()
     {
         Assert.Throws<ArgumentException>(() => IgnoreRuleSet.ParseGitIgnore("broken\\"));

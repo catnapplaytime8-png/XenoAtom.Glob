@@ -48,7 +48,7 @@ internal sealed class GlobCompiledSegment
                         continue;
 
                     case GlobTokenKind.CharClass:
-                        if (token.CharClass!.IsMatch(value[valueIndex]))
+                        if (token.CharClass!.IsMatch(value[valueIndex], comparison))
                         {
                             tokenIndex++;
                             valueIndex++;
