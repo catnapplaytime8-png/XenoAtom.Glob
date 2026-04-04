@@ -11,7 +11,11 @@ internal static class GlobParser
     public static GlobParseResult TryParse(string pattern, GlobParserOptions options)
     {
         ArgumentNullException.ThrowIfNull(pattern);
+        return TryParse(pattern.AsSpan(), options);
+    }
 
+    public static GlobParseResult TryParse(ReadOnlySpan<char> pattern, GlobParserOptions options)
+    {
         if (pattern.Length == 0)
         {
             return GlobParseResult.FromPattern(new GlobCompiledPattern([], false, false, GlobPatternKind.Empty, string.Empty, null, null));
@@ -24,7 +28,7 @@ internal static class GlobParser
         }
 
         var segments = new List<GlobCompiledSegment>();
-        var segmentBuilder = new StringBuilder();
+        var segmentStart = 0;
         var index = 0;
         var inCharClass = false;
         var escaped = false;
@@ -34,8 +38,6 @@ internal static class GlobParser
             var c = pattern[index];
             if (escaped)
             {
-                segmentBuilder.Append('\\');
-                segmentBuilder.Append(c);
                 escaped = false;
                 index++;
                 continue;
@@ -51,7 +53,6 @@ internal static class GlobParser
             if (c == '[')
             {
                 inCharClass = true;
-                segmentBuilder.Append(c);
                 index++;
                 continue;
             }
@@ -59,30 +60,28 @@ internal static class GlobParser
             if (c == ']' && inCharClass)
             {
                 inCharClass = false;
-                segmentBuilder.Append(c);
                 index++;
                 continue;
             }
 
             if (c == '/' && !inCharClass)
             {
-                if (segmentBuilder.Length > 0)
+                if (index > segmentStart)
                 {
-                    var parsedSegment = ParseSegment(segmentBuilder.ToString());
+                    var parsedSegment = ParseSegment(pattern[segmentStart..index]);
                     if (!parsedSegment.Success)
                     {
                         return parsedSegment;
                     }
 
                     segments.Add(parsedSegment.Pattern.Segments[0]);
-                    segmentBuilder.Clear();
                 }
 
+                segmentStart = index + 1;
                 index++;
                 continue;
             }
 
-            segmentBuilder.Append(c);
             index++;
         }
 
@@ -102,9 +101,9 @@ internal static class GlobParser
             return GlobParseResult.Failure(GlobPatternParseError.TrailingSeparatorNotAllowed);
         }
 
-        if (segmentBuilder.Length > 0)
+        if (segmentStart < pattern.Length)
         {
-            var parsedSegment = ParseSegment(segmentBuilder.ToString());
+            var parsedSegment = ParseSegment(pattern[segmentStart..]);
             if (!parsedSegment.Success)
             {
                 return parsedSegment;
@@ -117,12 +116,13 @@ internal static class GlobParser
         return GlobParseResult.FromPattern(compiledPattern);
     }
 
-    private static GlobParseResult ParseSegment(string segmentText)
+    private static GlobParseResult ParseSegment(ReadOnlySpan<char> segmentText)
     {
-        if (segmentText == "**")
+        if (segmentText.SequenceEqual("**"))
         {
+            var rawText = segmentText.ToString();
             return GlobParseResult.FromPattern(new GlobCompiledPattern(
-                [new GlobCompiledSegment(segmentText, [], true)],
+                [new GlobCompiledSegment(rawText, [], true)],
                 false,
                 false,
                 GlobPatternKind.RecursiveMatchAll,
@@ -176,8 +176,9 @@ internal static class GlobParser
         }
 
         FlushLiteral(tokens, literalBuilder);
+        var rawSegmentText = segmentText.ToString();
         return GlobParseResult.FromPattern(new GlobCompiledPattern(
-            [new GlobCompiledSegment(segmentText, tokens.ToArray(), false)],
+            [new GlobCompiledSegment(rawSegmentText, tokens.ToArray(), false)],
             false,
             false,
             GlobPatternKind.General,
@@ -278,7 +279,7 @@ internal static class GlobParser
         literalBuilder.Clear();
     }
 
-    private static ParsedCharClass TryParseCharClass(string text, int openingBracketIndex)
+    private static ParsedCharClass TryParseCharClass(ReadOnlySpan<char> text, int openingBracketIndex)
     {
         var index = openingBracketIndex + 1;
         var isNegated = false;

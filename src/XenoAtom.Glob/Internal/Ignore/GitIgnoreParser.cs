@@ -2,8 +2,6 @@
 // Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
-using System.Text;
-
 using XenoAtom.Glob.Ignore;
 
 namespace XenoAtom.Glob.Internal;
@@ -104,7 +102,7 @@ internal static class GitIgnoreParser
         }
 
         var basenameOnly = !ContainsUnescapedSlash(patternText);
-        var parseResult = GlobParser.TryParse(patternText.ToString(), GlobParserOptions.IgnorePattern);
+        var parseResult = GlobParser.TryParse(patternText, GlobParserOptions.IgnorePattern);
         if (!parseResult.Success)
         {
             throw new ArgumentException(
