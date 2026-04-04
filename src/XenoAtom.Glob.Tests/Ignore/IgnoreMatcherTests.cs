@@ -24,6 +24,52 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void ParseGitIgnore_ShouldReturnEmptyRuleSetForEmptyOrWhitespaceOnlyContent()
+    {
+        var empty = IgnoreRuleSet.ParseGitIgnore(string.Empty);
+        var whitespaceOnly = IgnoreRuleSet.ParseGitIgnore("   \n# comment\n \n");
+
+        Assert.AreEqual(0, empty.Rules.Count);
+        Assert.AreEqual(0, whitespaceOnly.Rules.Count);
+    }
+
+    [TestMethod]
+    public void ParseGitIgnore_ShouldPopulateRuleMetadata()
+    {
+        var ruleSet = IgnoreRuleSet.ParseGitIgnore(
+            " \nbin/\nsrc/generated/*.g.cs\nvendor\n",
+            baseDirectory: @"src\app",
+            sourcePath: ".gitignore",
+            sourceKind: IgnoreRuleSourceKind.CommandLine);
+
+        Assert.AreEqual(3, ruleSet.Rules.Count);
+
+        var directoryOnlyRule = ruleSet.Rules[0];
+        Assert.AreEqual("bin", directoryOnlyRule.PatternText);
+        Assert.AreEqual("bin/", directoryOnlyRule.RawPatternText);
+        Assert.IsTrue(directoryOnlyRule.DirectoryOnly);
+        Assert.IsTrue(directoryOnlyRule.BasenameOnly);
+        Assert.AreEqual("src/app", directoryOnlyRule.BaseDirectory);
+        Assert.AreEqual(2, directoryOnlyRule.LineNumber);
+        Assert.AreEqual(".gitignore", directoryOnlyRule.SourcePath);
+        Assert.AreEqual(IgnoreRuleSourceKind.CommandLine, directoryOnlyRule.SourceKind);
+
+        var pathRule = ruleSet.Rules[1];
+        Assert.AreEqual("src/generated/*.g.cs", pathRule.PatternText);
+        Assert.IsFalse(pathRule.DirectoryOnly);
+        Assert.IsFalse(pathRule.BasenameOnly);
+        Assert.AreEqual(3, pathRule.LineNumber);
+        Assert.AreEqual(IgnoreRuleSourceKind.CommandLine, pathRule.SourceKind);
+
+        var basenameRule = ruleSet.Rules[2];
+        Assert.AreEqual("vendor", basenameRule.PatternText);
+        Assert.IsFalse(basenameRule.DirectoryOnly);
+        Assert.IsTrue(basenameRule.BasenameOnly);
+        Assert.AreEqual(4, basenameRule.LineNumber);
+        Assert.AreEqual(IgnoreRuleSourceKind.CommandLine, basenameRule.SourceKind);
+    }
+
+    [TestMethod]
     public void Evaluate_ShouldMatchSimpleExclude()
     {
         var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("*.obj"));
