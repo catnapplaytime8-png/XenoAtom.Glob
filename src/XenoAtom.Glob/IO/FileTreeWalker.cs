@@ -76,12 +76,23 @@ public sealed class FileTreeWalker
 
             var relativePath = relativeDirectory.Length == 0 ? entry.Name : $"{relativeDirectory}/{entry.Name}";
             var fullPath = Path.Join(directoryPath, entry.Name);
+            var yieldedEntry = new FileTreeEntry(
+                relativePath,
+                fullPath,
+                entry.Name,
+                entry.IsDirectory,
+                entry.Attributes,
+                entry.Length,
+                entry.CreationTimeUtc,
+                entry.LastAccessTimeUtc,
+                entry.LastWriteTimeUtc,
+                entry.IsHidden);
 
             if (entry.IsDirectory)
             {
                 if (options.IncludeDirectories)
                 {
-                    yield return new FileTreeEntry(relativePath, fullPath, true);
+                    yield return yieldedEntry;
                 }
 
                 var childIgnoreStack = ignoreStack.PushDirectory(repositoryContext, relativePath);
@@ -93,7 +104,7 @@ public sealed class FileTreeWalker
                 continue;
             }
 
-            yield return new FileTreeEntry(relativePath, fullPath, false);
+            yield return yieldedEntry;
         }
     }
 
@@ -183,7 +194,15 @@ public sealed class FileTreeWalker
         }
     }
 
-    private readonly record struct RawFileSystemEntry(string Name, bool IsDirectory);
+    private readonly record struct RawFileSystemEntry(
+        string Name,
+        bool IsDirectory,
+        FileAttributes Attributes,
+        long Length,
+        DateTimeOffset CreationTimeUtc,
+        DateTimeOffset LastAccessTimeUtc,
+        DateTimeOffset LastWriteTimeUtc,
+        bool IsHidden);
 
     private sealed class DirectoryEnumerable : IEnumerable<RawFileSystemEntry>
     {
@@ -243,6 +262,14 @@ public sealed class FileTreeWalker
             => FileTreeWalker.ShouldIncludeEntry(ref entry, _relativeDirectory, _ignoreMatcher, _repositoryContext, _followSymbolicLinks);
 
         protected override RawFileSystemEntry TransformEntry(ref FileSystemEntry entry)
-            => new(entry.FileName.ToString(), entry.IsDirectory);
+            => new(
+                entry.FileName.ToString(),
+                entry.IsDirectory,
+                entry.Attributes,
+                entry.Length,
+                entry.CreationTimeUtc,
+                entry.LastAccessTimeUtc,
+                entry.LastWriteTimeUtc,
+                entry.IsHidden);
     }
 }

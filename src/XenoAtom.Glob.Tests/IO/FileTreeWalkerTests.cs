@@ -183,6 +183,40 @@ public class FileTreeWalkerTests
     }
 
     [TestMethod]
+    public void Enumerate_ShouldExposeCapturedFileSystemMetadata()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.CreateDirectory("src");
+        tempDirectory.WriteAllText("src/app.cs", "hello");
+
+        var walker = new FileTreeWalker();
+        var entries = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions { IncludeDirectories = true }).ToArray();
+        var directoryEntry = entries.Single(static x => x.RelativePath == "src");
+        var fileEntry = entries.Single(static x => x.RelativePath == "src/app.cs");
+        var filePath = tempDirectory.GetPath("src", "app.cs");
+        var directoryPath = tempDirectory.GetPath("src");
+
+        Assert.AreEqual("src", directoryEntry.Name);
+        Assert.AreEqual(directoryPath, directoryEntry.FullPath);
+        Assert.IsTrue(directoryEntry.IsDirectory);
+        Assert.AreEqual(File.GetAttributes(directoryPath), directoryEntry.Attributes);
+        Assert.AreEqual((directoryEntry.Attributes & FileAttributes.Hidden) != 0, directoryEntry.IsHidden);
+        AssertTimestampClose(new DateTimeOffset(Directory.GetCreationTimeUtc(directoryPath), TimeSpan.Zero), directoryEntry.CreationTimeUtc);
+        AssertTimestampClose(new DateTimeOffset(Directory.GetLastAccessTimeUtc(directoryPath), TimeSpan.Zero), directoryEntry.LastAccessTimeUtc);
+        AssertTimestampClose(new DateTimeOffset(Directory.GetLastWriteTimeUtc(directoryPath), TimeSpan.Zero), directoryEntry.LastWriteTimeUtc);
+
+        Assert.AreEqual("app.cs", fileEntry.Name);
+        Assert.AreEqual(filePath, fileEntry.FullPath);
+        Assert.IsFalse(fileEntry.IsDirectory);
+        Assert.AreEqual(5L, fileEntry.Length);
+        Assert.AreEqual(File.GetAttributes(filePath), fileEntry.Attributes);
+        Assert.AreEqual((fileEntry.Attributes & FileAttributes.Hidden) != 0, fileEntry.IsHidden);
+        AssertTimestampClose(new DateTimeOffset(File.GetCreationTimeUtc(filePath), TimeSpan.Zero), fileEntry.CreationTimeUtc);
+        AssertTimestampClose(new DateTimeOffset(File.GetLastAccessTimeUtc(filePath), TimeSpan.Zero), fileEntry.LastAccessTimeUtc);
+        AssertTimestampClose(new DateTimeOffset(File.GetLastWriteTimeUtc(filePath), TimeSpan.Zero), fileEntry.LastWriteTimeUtc);
+    }
+
+    [TestMethod]
     public void Enumerate_ShouldInvalidateCachedIgnoreFilesWhenGitIgnoreChanges()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -366,5 +400,11 @@ public class FileTreeWalkerTests
             .ToArray();
 
         CollectionAssert.AreEqual(expected, actual, $"Mismatch for core.ignorecase={ignoreCase}.");
+    }
+
+    private static void AssertTimestampClose(DateTimeOffset expected, DateTimeOffset actual)
+    {
+        var delta = (expected - actual).Duration();
+        Assert.IsTrue(delta <= TimeSpan.FromSeconds(1), $"Expected timestamp {expected:O} to be within one second of {actual:O}.");
     }
 }

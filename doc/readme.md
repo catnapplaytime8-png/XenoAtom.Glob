@@ -105,6 +105,7 @@ Traversal characteristics:
 - prunes ignored directories before descent
 - loads `.gitignore` lazily when entering directories
 - reuses cached parsed ignore files and repository-root ignore state through `RepositoryContext` when file metadata is unchanged
+- exposes captured `FileSystemEntry`-style metadata such as `Attributes`, `Length`, and UTC timestamps on `FileTreeEntry`
 - does not follow reparse points or symbolic links by default
 - supports cancellation through `FileTreeWalkOptions.CancellationToken`
 
