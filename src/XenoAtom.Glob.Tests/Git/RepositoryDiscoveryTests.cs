@@ -25,6 +25,19 @@ public class RepositoryDiscoveryTests
     }
 
     [TestMethod]
+    public void TryDiscover_ShouldReturnFalseOutsideGitWorkingTree()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.CreateDirectory("nested");
+        tempDirectory.WriteAllText(Path.Combine("nested", "orphan.txt"), "content");
+
+        var found = RepositoryDiscovery.TryDiscover(tempDirectory.GetPath("nested", "orphan.txt"), out var context);
+
+        Assert.IsFalse(found);
+        Assert.IsNull(context);
+    }
+
+    [TestMethod]
     public void Discover_ShouldResolveGitFile()
     {
         using var tempDirectory = new TemporaryDirectory();

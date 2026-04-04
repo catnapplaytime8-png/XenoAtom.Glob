@@ -620,6 +620,19 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void IgnoreMatcherEvaluator_Dispose_ShouldBeIdempotent()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("**/target.tmp"));
+        var evaluator = matcher.CreateEvaluator();
+        ReadOnlySpan<char> candidate = CreateLongRelativePath(segmentCount: 36, segmentLength: 8, leafName: "target.tmp");
+
+        _ = evaluator.Evaluate(candidate);
+
+        evaluator.Dispose();
+        evaluator.Dispose();
+    }
+
+    [TestMethod]
     public void ParseGitIgnore_ShouldRejectInvalidTrailingEscape()
     {
         Assert.Throws<ArgumentException>(() => IgnoreRuleSet.ParseGitIgnore("broken\\"));
