@@ -89,6 +89,13 @@ public class GlobPatternTests
     }
 
     [TestMethod]
+    public void IsMatch_ShouldKeepLeadingLiteralAnchoredBeforeFirstStar()
+    {
+        Assert.IsFalse(GlobPattern.Parse("unittest*.pb.*").IsMatch("message_differencer_unittest.pb.obj"));
+        Assert.IsFalse(GlobPattern.Parse("coverage.*[.json, .xml, .info]").IsMatch("AssemblyCoverage.cs"));
+    }
+
+    [TestMethod]
     public void IsMatch_ShouldHandleSingleEntryAndLiteralOpeningBracketCharacterClasses()
     {
         Assert.IsTrue(GlobPattern.Parse("file[a].txt").IsMatch("filea.txt"));
@@ -113,6 +120,20 @@ public class GlobPatternTests
         Assert.IsTrue(lower.Pattern.Match(PathNormalizer.NormalizeRelativePath("A.cs"), PathStringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(negated.Pattern.Match(PathNormalizer.NormalizeRelativePath("a.bin"), PathStringComparison.OrdinalIgnoreCase));
         Assert.IsTrue(negated.Pattern.Match(PathNormalizer.NormalizeRelativePath("1.bin"), PathStringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void Match_ShouldKeepLeadingLiteralAnchoredBeforeFirstStar_WhenIgnoreCase()
+    {
+        var parseResult = GlobParser.TryParse("coverage.*[.json, .xml, .info]", GlobParserOptions.IgnorePattern);
+        Assert.IsTrue(parseResult.Success);
+
+        Assert.IsFalse(parseResult.Pattern.Match(
+            PathNormalizer.NormalizeRelativePath("AssemblyCoverage.cs"),
+            PathStringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(parseResult.Pattern.Match(
+            PathNormalizer.NormalizeRelativePath("ReleaserApp.Coverage.cs"),
+            PathStringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]

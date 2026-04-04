@@ -142,6 +142,38 @@ public class GitIgnoreDifferentialTests
     }
 
     [TestMethod]
+    public void GitDifferential_ShouldKeepLeadingLiteralsAnchoredBeforeFirstStar()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+        git.RunChecked("config", "core.ignorecase", "true");
+
+        tempDirectory.WriteAllText(".gitignore", """
+            coverage.*[.json, .xml, .info]
+            unittest*.pb.*
+            """);
+
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(
+            File.ReadAllText(tempDirectory.GetPath(".gitignore")),
+            sourcePath: ".gitignore"));
+        var paths = new[]
+        {
+            "AssemblyCoverage.cs",
+            "ReleaserApp.Coverage.cs",
+            "message_differencer_unittest.pb.cc.rule",
+            "message_differencer_unittest.pb.obj",
+            "unittest_message.pb.obj",
+        };
+        var gitResults = QueryGit(git, paths);
+
+        foreach (var path in paths)
+        {
+            GitCompatibilityAssert.Matches(path, false, git, gitResults[path], matcher, "anchored-leading-literals-before-star");
+        }
+    }
+
+    [TestMethod]
     public void GitDifferential_ShouldMatchGitignoreDocumentationPatternExamples()
     {
         using var tempDirectory = new TemporaryDirectory();

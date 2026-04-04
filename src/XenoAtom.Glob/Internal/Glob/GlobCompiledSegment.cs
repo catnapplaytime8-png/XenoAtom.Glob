@@ -98,7 +98,7 @@ internal sealed class GlobCompiledSegment
                             continue;
                         }
 
-                        if (starTokenIndex == tokenIndex - 1)
+                        if (starTokenIndex >= 0 && starTokenIndex == tokenIndex - 1)
                         {
                             var literalIndex = value[valueIndex..].IndexOf(literal, comparison.Value);
                             if (literalIndex < 0)
