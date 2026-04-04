@@ -18,6 +18,8 @@ namespace XenoAtom.Glob.Tests.IO;
 public class FileTreeWalkerTests
 {
     private const string CodeCorpusEnabledEnvironmentVariable = "XENOATOM_GLOB_ENABLE_CODE_CORPUS";
+    private const string CodeCorpusFilterEnvironmentVariable = "XENOATOM_GLOB_CODE_CORPUS_FILTER";
+    private const int GitCheckIgnoreBatchSize = 4096;
     private const string DisabledCodeCorpusDataMarker = "<disabled>";
 
     [TestMethod]
@@ -469,22 +471,41 @@ public class FileTreeWalkerTests
 
     private static string[] QueryVisiblePathsFromGit(GitCli git, IReadOnlyList<string> paths)
     {
-        var input = string.Join('\0', paths) + '\0';
-        var result = git.RunCheckedWithInput(input, "check-ignore", "--no-index", "--stdin", "-z", "-v", "--non-matching");
-        var tokens = result.StandardOutput.Split('\0');
         var visiblePaths = new List<string>();
-        for (var index = 0; index + 3 < tokens.Length; index += 4)
+        for (var start = 0; start < paths.Count; start += GitCheckIgnoreBatchSize)
         {
-            var pattern = tokens[index + 2];
-            var path = tokens[index + 3];
-            if (path.Length == 0)
+            var end = Math.Min(start + GitCheckIgnoreBatchSize, paths.Count);
+            var builder = new System.Text.StringBuilder();
+            for (var index = start; index < end; index++)
             {
-                continue;
+                builder.Append(paths[index]);
+                builder.Append('\0');
             }
 
-            if (pattern.Length == 0 || pattern[0] == '!')
+            var result = git.RunWithInput(builder.ToString(), "check-ignore", "--no-index", "--stdin", "-z", "-v", "--non-matching");
+            if (result.ExitCode is not 0 and not 1)
             {
-                visiblePaths.Add(path);
+                throw git.CreateCommandFailure(result);
+            }
+
+            var tokens = result.StandardOutput.Split('\0');
+            var expectedRecordCount = end - start;
+            var actualRecordCount = 0;
+            for (var index = 0; index + 3 < tokens.Length && actualRecordCount < expectedRecordCount; index += 4, actualRecordCount++)
+            {
+                var pattern = tokens[index + 2];
+                var path = paths[start + actualRecordCount];
+
+                if (pattern.Length == 0 || pattern[0] == '!')
+                {
+                    visiblePaths.Add(path);
+                }
+            }
+
+            if (actualRecordCount != expectedRecordCount)
+            {
+                throw new InvalidOperationException(
+                    $"Git returned {actualRecordCount} check-ignore records for {expectedRecordCount} input paths.");
             }
         }
 
@@ -682,6 +703,17 @@ public class FileTreeWalkerTests
             yield break;
         }
 
+        var filteredRepositoryRoots = GetFilteredRepositoryRoots(scanRoot);
+        if (filteredRepositoryRoots is not null)
+        {
+            foreach (var repositoryRoot in filteredRepositoryRoots)
+            {
+                yield return new object[] { repositoryRoot };
+            }
+
+            yield break;
+        }
+
         foreach (var repositoryRoot in EnumerateRepositoryRoots(scanRoot)
                      .OrderBy(static x => x, GetPathComparer()))
         {
@@ -706,56 +738,48 @@ public class FileTreeWalkerTests
 
     private static IEnumerable<string> EnumerateRepositoryRoots(string scanRoot)
     {
-        var pending = new Stack<string>();
         var comparer = GetPathComparer();
         var seen = new HashSet<string>(comparer);
-        pending.Push(scanRoot);
 
-        while (pending.Count > 0)
+        IEnumerable<string> children;
+        try
         {
-            var current = pending.Pop();
-            var fullCurrentPath = Path.GetFullPath(current);
-            if (!seen.Add(fullCurrentPath))
+            children = Directory.EnumerateDirectories(scanRoot);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            yield break;
+        }
+
+        foreach (var child in children)
+        {
+            if (string.Equals(Path.GetFileName(child), ".git", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            if (HasNestedGitDirectory(fullCurrentPath))
-            {
-                yield return fullCurrentPath;
-            }
-
-            IEnumerable<string> children;
             try
             {
-                children = Directory.EnumerateDirectories(fullCurrentPath);
+                var attributes = File.GetAttributes(child);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    continue;
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 continue;
             }
 
-            foreach (var child in children)
+            var fullChildPath = Path.GetFullPath(child);
+            if (!seen.Add(fullChildPath))
             {
-                if (string.Equals(Path.GetFileName(child), ".git", StringComparison.Ordinal))
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                try
-                {
-                    var attributes = File.GetAttributes(child);
-                    if ((attributes & FileAttributes.ReparsePoint) != 0)
-                    {
-                        continue;
-                    }
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    continue;
-                }
-
-                pending.Push(child);
+            if (IsRepositoryRoot(fullChildPath))
+            {
+                yield return fullChildPath;
             }
         }
     }
@@ -785,6 +809,78 @@ public class FileTreeWalkerTests
             Environment.GetEnvironmentVariable(CodeCorpusEnabledEnvironmentVariable),
             "1",
             StringComparison.Ordinal);
+
+    private static List<string>? GetFilteredRepositoryRoots(string scanRoot)
+    {
+        var filter = Environment.GetEnvironmentVariable(CodeCorpusFilterEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            return null;
+        }
+
+        var comparer = GetPathComparer();
+        var roots = new List<string>();
+        var seen = new HashSet<string>(comparer);
+        foreach (var rawEntry in filter.Split([';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var candidateRoot = Path.IsPathRooted(rawEntry)
+                ? rawEntry
+                : Path.Combine(scanRoot, rawEntry);
+
+            var fullCandidateRoot = Path.GetFullPath(candidateRoot);
+            if (!fullCandidateRoot.StartsWith(scanRoot, comparer == StringComparer.OrdinalIgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!Directory.Exists(fullCandidateRoot))
+            {
+                continue;
+            }
+
+            var repositoryRoot = ResolveRepositoryRoot(fullCandidateRoot);
+            if (repositoryRoot is null)
+            {
+                continue;
+            }
+
+            if (seen.Add(repositoryRoot))
+            {
+                roots.Add(repositoryRoot);
+            }
+        }
+
+        roots.Sort(comparer);
+        return roots;
+    }
+
+    private static bool IsRepositoryRoot(string path)
+    {
+        var repositoryRoot = ResolveRepositoryRoot(path);
+        return repositoryRoot is not null && GetPathComparer().Equals(repositoryRoot, path);
+    }
+
+    private static string? ResolveRepositoryRoot(string path)
+    {
+        if (!HasNestedGitDirectory(path))
+        {
+            return null;
+        }
+
+        var result = GitCli.In(path).Run("rev-parse", "--show-toplevel");
+        if (result.ExitCode != 0)
+        {
+            return null;
+        }
+
+        var repositoryRoot = result.StandardOutput.Trim();
+        if (repositoryRoot.Length == 0)
+        {
+            return null;
+        }
+
+        return Path.GetFullPath(repositoryRoot);
+    }
 
     private static StringComparer GetPathComparer()
         => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;

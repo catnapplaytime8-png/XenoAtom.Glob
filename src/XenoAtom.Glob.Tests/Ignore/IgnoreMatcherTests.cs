@@ -130,6 +130,24 @@ public class IgnoreMatcherTests
     }
 
     [TestMethod]
+    public void Evaluate_ShouldMatchIndexedBasenameRulesWithMultiDotSuffixes()
+    {
+        var rules = Enumerable.Range(0, 40)
+            .Select(static index => $"*.noise{index}")
+            .Append("*.nuget.g.props")
+            .Append("*.nuget.g.targets");
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore(string.Join('\n', rules)));
+
+        var propsResult = matcher.Evaluate("src/project.csproj.nuget.g.props");
+        var targetsResult = matcher.Evaluate("src/project.csproj.nuget.g.targets");
+
+        Assert.IsTrue(propsResult.IsIgnored);
+        Assert.AreEqual("*.nuget.g.props", propsResult.Rule!.PatternText);
+        Assert.IsTrue(targetsResult.IsIgnored);
+        Assert.AreEqual("*.nuget.g.targets", targetsResult.Rule!.PatternText);
+    }
+
+    [TestMethod]
     public void Evaluate_ShouldStopAtIgnoredAncestorDirectory()
     {
         var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
@@ -141,6 +159,62 @@ public class IgnoreMatcherTests
 
         Assert.IsTrue(result.IsIgnored);
         Assert.AreEqual("cache/", result.Rule!.RawPatternText);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldNotTreatTrailingDoubleStarAsIgnoringTheDirectoryItself()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
+            tools/**
+            !tools/packages.config
+            """));
+
+        var directoryResult = matcher.Evaluate("tools", isDirectory: true);
+        var restoredFileResult = matcher.Evaluate("tools/packages.config");
+        var otherFileResult = matcher.Evaluate("tools/other.txt");
+
+        Assert.IsFalse(directoryResult.IsIgnored);
+        Assert.IsTrue(restoredFileResult.IsMatch);
+        Assert.IsFalse(restoredFileResult.IsIgnored);
+        Assert.AreEqual("!tools/packages.config", restoredFileResult.Rule!.RawPatternText);
+        Assert.IsTrue(otherFileResult.IsIgnored);
+        Assert.AreEqual("tools/**", otherFileResult.Rule!.RawPatternText);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldAllowNegatedDirectoryExceptionToKeepChildrenReachable()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
+            [Dd]ebug/
+            !src/coreclr/debug
+            """));
+
+        var directoryResult = matcher.Evaluate("src/coreclr/debug", isDirectory: true);
+        var childResult = matcher.Evaluate("src/coreclr/debug/CMakeLists.txt");
+
+        Assert.IsTrue(directoryResult.IsMatch);
+        Assert.IsFalse(directoryResult.IsIgnored);
+        Assert.AreEqual("!src/coreclr/debug", directoryResult.Rule!.RawPatternText);
+        Assert.IsFalse(childResult.IsIgnored);
+    }
+
+    [TestMethod]
+    public void Evaluate_ShouldAllowNegatedFileUnderDoubleStarDirectoryPattern()
+    {
+        var matcher = new IgnoreMatcher(IgnoreRuleSet.ParseGitIgnore("""
+            **/.vscode/**
+            !**/.vscode/c_cpp_properties.json
+            """));
+
+        var directoryResult = matcher.Evaluate("src/vm/.vscode", isDirectory: true);
+        var restoredFileResult = matcher.Evaluate("src/vm/.vscode/c_cpp_properties.json");
+        var ignoredFileResult = matcher.Evaluate("src/vm/.vscode/settings.json");
+
+        Assert.IsFalse(directoryResult.IsIgnored);
+        Assert.IsTrue(restoredFileResult.IsMatch);
+        Assert.IsFalse(restoredFileResult.IsIgnored);
+        Assert.AreEqual("!**/.vscode/c_cpp_properties.json", restoredFileResult.Rule!.RawPatternText);
+        Assert.IsTrue(ignoredFileResult.IsIgnored);
     }
 
     [TestMethod]

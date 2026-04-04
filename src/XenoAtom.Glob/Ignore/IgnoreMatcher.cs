@@ -330,7 +330,7 @@ public sealed class IgnoreMatcher
                 rule.CompiledPattern.SuffixText is { Length: > 0 } suffixText &&
                 suffixText[0] == '.')
             {
-                AddCandidate(ref extensionSuffixRules, ignoreCase, suffixText, ruleIndex);
+                AddCandidate(ref extensionSuffixRules, ignoreCase, GetExtension(suffixText.AsSpan()).ToString(), ruleIndex);
                 indexedRuleCount++;
                 continue;
             }

@@ -375,24 +375,31 @@ public class GitIgnoreDifferentialTests
     private static Dictionary<string, GitCheckIgnoreResult> QueryGit(GitCli git, IReadOnlyList<string> paths)
     {
         var input = string.Join('\0', paths) + '\0';
-        var result = git.RunCheckedWithInput(input, "check-ignore", "--no-index", "--stdin", "-z", "-v", "--non-matching");
+        var result = git.RunWithInput(input, "check-ignore", "--no-index", "--stdin", "-z", "-v", "--non-matching");
+        if (result.ExitCode is not 0 and not 1)
+        {
+            throw git.CreateCommandFailure(result);
+        }
+
         var tokens = result.StandardOutput.Split('\0');
         var map = new Dictionary<string, GitCheckIgnoreResult>(StringComparer.Ordinal);
-
-        for (var index = 0; index + 3 < tokens.Length; index += 4)
+        var actualRecordCount = 0;
+        for (var index = 0; index + 3 < tokens.Length && actualRecordCount < paths.Count; index += 4, actualRecordCount++)
         {
             var source = tokens[index];
             var lineNumber = tokens[index + 1];
             var pattern = tokens[index + 2];
-            var path = tokens[index + 3];
-            if (path.Length == 0)
-            {
-                continue;
-            }
+            var path = paths[actualRecordCount];
 
             map[path] = string.IsNullOrEmpty(pattern)
                 ? new GitCheckIgnoreResult(false, null, null, null)
                 : new GitCheckIgnoreResult(!pattern.StartsWith('!'), source, lineNumber, pattern);
+        }
+
+        if (actualRecordCount != paths.Count)
+        {
+            throw new InvalidOperationException(
+                $"Git returned {actualRecordCount} check-ignore records for {paths.Count} input paths.");
         }
 
         return map;

@@ -41,28 +41,18 @@ internal static class IgnoreRuleMatcher
             return rule.CompiledPattern.Match(finalSegment, isDirectory, segmentCount: 1, comparison, evaluator);
         }
 
-        var matchedSegmentCount = 0;
-        for (var index = 0; index <= relativePath.Length; index++)
+        if (rule.DirectoryOnly && !isDirectory)
         {
-            if (index < relativePath.Length && relativePath[index] != '/')
-            {
-                continue;
-            }
-
-            matchedSegmentCount++;
-            var prefixIsDirectory = index < relativePath.Length || isDirectory;
-            if (rule.DirectoryOnly && !prefixIsDirectory)
-            {
-                continue;
-            }
-
-            if (rule.CompiledPattern.Match(relativePath[..index], prefixIsDirectory, matchedSegmentCount, comparison, evaluator))
-            {
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        var segmentCount = CountSegments(relativePath);
+        if (!rule.CompiledPattern.Match(relativePath, isDirectory, segmentCount, comparison, evaluator))
+        {
+            return false;
+        }
+
+        return !MatchesBoundaryDirectoryOnly(rule, relativePath, segmentCount, comparison, evaluator);
     }
 
     private static bool TryGetRelativePathRange(string baseDirectory, ReadOnlySpan<char> candidatePath, PathStringComparison comparison, out int relativeStart, out int relativeLength)
@@ -94,5 +84,30 @@ internal static class IgnoreRuleMatcher
         relativeStart = 0;
         relativeLength = 0;
         return false;
+    }
+
+    private static int CountSegments(ReadOnlySpan<char> path)
+    {
+        var segmentCount = 1;
+        for (var index = 0; index < path.Length; index++)
+        {
+            if (path[index] == '/')
+            {
+                segmentCount++;
+            }
+        }
+
+        return segmentCount;
+    }
+
+    private static bool MatchesBoundaryDirectoryOnly(
+        IgnoreRule rule,
+        ReadOnlySpan<char> relativePath,
+        int segmentCount,
+        PathStringComparison comparison,
+        IgnoreMatcherEvaluator? evaluator)
+    {
+        return rule.CompiledPattern.HasTrailingRecursiveWildcard &&
+               rule.CompiledPattern.MatchWithoutTrailingRecursiveWildcard(relativePath, segmentCount, comparison, evaluator);
     }
 }

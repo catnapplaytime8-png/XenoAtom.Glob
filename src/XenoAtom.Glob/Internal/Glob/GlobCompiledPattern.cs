@@ -40,6 +40,8 @@ internal sealed class GlobCompiledPattern
 
     public string? SuffixText { get; }
 
+    public bool HasTrailingRecursiveWildcard => Segments.Length > 0 && Segments[^1].IsRecursiveWildcard;
+
     public bool Match(NormalizedPath path, PathStringComparison comparison)
         => Match(path.Value.AsSpan(), path.IsDirectory, path.SegmentCount, comparison, evaluator: null);
 
@@ -57,6 +59,16 @@ internal sealed class GlobCompiledPattern
         };
     }
 
+    public bool MatchWithoutTrailingRecursiveWildcard(ReadOnlySpan<char> path, int segmentCount, PathStringComparison comparison, Ignore.IgnoreMatcherEvaluator? evaluator = null)
+    {
+        if (!HasTrailingRecursiveWildcard || Segments.Length == 1)
+        {
+            return false;
+        }
+
+        return MatchGeneral(path, segmentCount, comparison, evaluator, Segments.Length - 1);
+    }
+
     public bool MatchGeneralOnly(NormalizedPath path, PathStringComparison comparison)
     {
         return MatchGeneral(path.Value.AsSpan(), path.SegmentCount, comparison, evaluator: null);
@@ -64,20 +76,21 @@ internal sealed class GlobCompiledPattern
 
     public string GetDebugView() => $"{Kind}: {string.Join("/", Segments.Select(static x => x.RawText))}";
 
-    private bool MatchGeneral(ReadOnlySpan<char> path, int segmentCount, PathStringComparison comparison, Ignore.IgnoreMatcherEvaluator? evaluator)
+    private bool MatchGeneral(ReadOnlySpan<char> path, int segmentCount, PathStringComparison comparison, Ignore.IgnoreMatcherEvaluator? evaluator, int? patternLength = null)
     {
+        var maxPatternLength = patternLength ?? Segments.Length;
         if (segmentCount <= 32)
         {
             Span<SegmentRange> segmentRanges = stackalloc SegmentRange[segmentCount];
             FillPathSegments(path, segmentRanges);
-            return MatchSegments(path, segmentRanges, 0, 0, comparison);
+            return MatchSegments(path, segmentRanges, 0, 0, maxPatternLength, comparison);
         }
 
         if (evaluator is not null)
         {
             var segmentRanges = evaluator.GetSegmentBuffer(segmentCount);
             FillPathSegments(path, segmentRanges);
-            return MatchSegments(path, segmentRanges, 0, 0, comparison);
+            return MatchSegments(path, segmentRanges, 0, 0, maxPatternLength, comparison);
         }
 
         var rentedBuffer = ArrayPool<SegmentRange>.Shared.Rent(segmentCount);
@@ -85,7 +98,7 @@ internal sealed class GlobCompiledPattern
         {
             var segmentRanges = rentedBuffer.AsSpan(0, segmentCount);
             FillPathSegments(path, segmentRanges);
-            return MatchSegments(path, segmentRanges, 0, 0, comparison);
+            return MatchSegments(path, segmentRanges, 0, 0, maxPatternLength, comparison);
         }
         finally
         {
@@ -93,26 +106,26 @@ internal sealed class GlobCompiledPattern
         }
     }
 
-    private bool MatchSegments(ReadOnlySpan<char> path, ReadOnlySpan<SegmentRange> segmentRanges, int patternIndex, int segmentIndex, PathStringComparison comparison)
+    private bool MatchSegments(ReadOnlySpan<char> path, ReadOnlySpan<SegmentRange> segmentRanges, int patternIndex, int segmentIndex, int patternLength, PathStringComparison comparison)
     {
-        while (patternIndex < Segments.Length)
+        while (patternIndex < patternLength)
         {
             var segment = Segments[patternIndex];
             if (segment.IsRecursiveWildcard)
             {
-                while (patternIndex + 1 < Segments.Length && Segments[patternIndex + 1].IsRecursiveWildcard)
+                while (patternIndex + 1 < patternLength && Segments[patternIndex + 1].IsRecursiveWildcard)
                 {
                     patternIndex++;
                 }
 
-                if (patternIndex == Segments.Length - 1)
+                if (patternIndex == patternLength - 1)
                 {
                     return true;
                 }
 
                 for (var candidate = segmentIndex; candidate <= segmentRanges.Length; candidate++)
                 {
-                    if (MatchSegments(path, segmentRanges, patternIndex + 1, candidate, comparison))
+                    if (MatchSegments(path, segmentRanges, patternIndex + 1, candidate, patternLength, comparison))
                     {
                         return true;
                     }

@@ -79,15 +79,32 @@ internal sealed class GitCli
             throw new InvalidOperationException("Unable to start git process.");
         }
 
+        var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+        var standardErrorTask = process.StandardError.ReadToEndAsync();
+        IOException? standardInputWriteException = null;
         if (standardInput is not null)
         {
-            process.StandardInput.Write(standardInput);
-            process.StandardInput.Close();
+            try
+            {
+                process.StandardInput.Write(standardInput);
+            }
+            catch (IOException ex)
+            {
+                standardInputWriteException = ex;
+            }
+            finally
+            {
+                process.StandardInput.Close();
+            }
         }
 
-        var standardOutput = process.StandardOutput.ReadToEnd();
-        var standardError = process.StandardError.ReadToEnd();
         process.WaitForExit();
+        var standardOutput = standardOutputTask.GetAwaiter().GetResult();
+        var standardError = standardErrorTask.GetAwaiter().GetResult();
+        if (standardInputWriteException is not null)
+        {
+            standardError = $"{standardError}Standard input write failed: {standardInputWriteException.Message}\n";
+        }
 
         return new GitCommandResult(
             process.ExitCode,
@@ -96,7 +113,7 @@ internal sealed class GitCli
             string.Join(" ", startInfo.ArgumentList.Select(EscapeArgument)));
     }
 
-    private InvalidOperationException CreateCommandFailure(GitCommandResult result)
+    internal InvalidOperationException CreateCommandFailure(GitCommandResult result)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"Git command failed: git {result.CommandLine}");
