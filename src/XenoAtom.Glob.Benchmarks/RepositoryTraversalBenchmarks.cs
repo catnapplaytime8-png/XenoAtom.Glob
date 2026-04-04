@@ -1,78 +1,45 @@
-using System.IO.Enumeration;
-
 using BenchmarkDotNet.Attributes;
 
 using LibGit2Sharp;
-using GitIgnore = LibGit2Sharp.Ignore;
 
 using XenoAtom.Glob.Git;
-using XenoAtom.Glob.IO;
+using XenoAtom.Glob.Ignore;
 
 namespace XenoAtom.Glob.Benchmarks;
 
 [MemoryDiagnoser]
 public class RepositoryTraversalBenchmarks
 {
-    private static readonly EnumerationOptions EnumerationOptions = new()
-    {
-        AttributesToSkip = 0,
-        IgnoreInaccessible = false,
-        RecurseSubdirectories = false,
-    };
-
     private string _repositoryRoot = null!;
-    private FileTreeWalker _walker = null!;
-    private FileTreeWalkOptions _walkOptions = null!;
+    private string[] _repositoryFiles = null!;
+    private IgnoreMatcher _matcher = null!;
     private Repository _libGitRepository = null!;
 
     [GlobalSetup]
     public void Setup()
     {
         _repositoryRoot = FindRepositoryRoot();
-        _walker = new FileTreeWalker();
-        _walkOptions = new FileTreeWalkOptions
-        {
-            RepositoryContext = RepositoryDiscovery.Discover(_repositoryRoot),
-        };
+        _repositoryFiles = CollectRepositoryFiles(_repositoryRoot).ToArray();
+        _matcher = BuildMatcherFromRepository(_repositoryRoot);
         _libGitRepository = new Repository(_repositoryRoot);
 
-        var xenoCount = EnumerateCurrentRepositoryWithGitIgnore();
-        var libGit2SharpCount = EnumerateCurrentRepositoryWithLibGit2SharpIgnoreChecks();
+        var xenoCount = MatchCollectedRepositoryFilesWithGitIgnore();
+        var libGit2SharpCount = MatchCollectedRepositoryFilesWithLibGit2SharpIgnoreChecks();
         if (xenoCount != libGit2SharpCount)
         {
             throw new InvalidOperationException(
-                $"Repository traversal counts diverged. XenoAtom.Glob={xenoCount}, LibGit2Sharp={libGit2SharpCount}.");
+                $"Repository match counts diverged. XenoAtom.Glob={xenoCount}, LibGit2Sharp={libGit2SharpCount}.");
         }
     }
 
     [Benchmark(Baseline = true)]
-    public int EnumerateCurrentRepositoryWithGitIgnore()
-        => _walker.Enumerate(_repositoryRoot, _walkOptions).Count();
-
-    [Benchmark]
-    public int EnumerateCurrentRepositoryWithLibGit2SharpIgnoreChecks()
-        => CountVisibleEntriesWithLibGit2Sharp(_repositoryRoot, _libGitRepository.Ignore);
-
-    [GlobalCleanup]
-    public void Cleanup() => _libGitRepository.Dispose();
-
-    private static int CountVisibleEntriesWithLibGit2Sharp(string repositoryRoot, GitIgnore ignore)
+    public int MatchCollectedRepositoryFilesWithGitIgnore()
     {
         var count = 0;
-        var stack = new Stack<TraversalFrame>();
-        stack.Push(new TraversalFrame(repositoryRoot, string.Empty, true));
-
-        while (stack.Count > 0)
+        foreach (var path in _repositoryFiles)
         {
-            var frame = stack.Pop();
-            foreach (var child in EnumerateVisibleEntries(frame.FullPath, frame.RelativePath, ignore))
+            if (!_matcher.Evaluate(path).IsIgnored)
             {
-                if (child.IsDirectory)
-                {
-                    stack.Push(child);
-                    continue;
-                }
-
                 count++;
             }
         }
@@ -80,13 +47,129 @@ public class RepositoryTraversalBenchmarks
         return count;
     }
 
-    private static IEnumerable<TraversalFrame> EnumerateVisibleEntries(string directoryPath, string relativeDirectory, GitIgnore ignore)
+    [Benchmark]
+    public int MatchCollectedRepositoryFilesWithLibGit2SharpIgnoreChecks()
     {
-        using var enumerator = new RepositoryComparisonEnumerator(directoryPath, relativeDirectory, ignore);
-        while (enumerator.MoveNext())
+        var count = 0;
+        foreach (var path in _repositoryFiles)
         {
-            yield return enumerator.Current;
+            if (!_libGitRepository.Ignore.IsPathIgnored(path))
+            {
+                count++;
+            }
         }
+
+        return count;
+    }
+
+    [GlobalCleanup]
+    public void Cleanup() => _libGitRepository.Dispose();
+
+    private static IgnoreMatcher BuildMatcherFromRepository(string repositoryRoot)
+    {
+        var repository = RepositoryDiscovery.Discover(repositoryRoot);
+        var ruleSets = new List<IgnoreRuleSet>();
+
+        if (repository.GlobalExcludePath is { } globalExcludePath && File.Exists(globalExcludePath))
+        {
+            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(globalExcludePath),
+                sourcePath: globalExcludePath,
+                sourceKind: IgnoreRuleSourceKind.GlobalExclude));
+        }
+
+        var infoExcludePath = repository.InfoExcludePath;
+        if (File.Exists(infoExcludePath))
+        {
+            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(infoExcludePath),
+                sourcePath: infoExcludePath,
+                sourceKind: IgnoreRuleSourceKind.RepositoryExclude));
+        }
+
+        foreach (var gitIgnorePath in EnumerateGitIgnoreFiles(repositoryRoot))
+        {
+            var baseDirectory = Path.GetDirectoryName(gitIgnorePath)!;
+            var relativeBase = Path.GetRelativePath(repositoryRoot, baseDirectory).Replace('\\', '/');
+            if (relativeBase == ".")
+            {
+                relativeBase = string.Empty;
+            }
+
+            ruleSets.Add(IgnoreRuleSet.ParseGitIgnore(
+                File.ReadAllText(gitIgnorePath),
+                baseDirectory: relativeBase,
+                sourcePath: gitIgnorePath,
+                sourceKind: IgnoreRuleSourceKind.PerDirectory));
+        }
+
+        return new IgnoreMatcher(ruleSets);
+    }
+
+    private static IEnumerable<string> EnumerateGitIgnoreFiles(string repositoryRoot)
+    {
+        var stack = new Stack<string>();
+        stack.Push(repositoryRoot);
+
+        while (stack.Count > 0)
+        {
+            var currentDirectory = stack.Pop();
+
+            foreach (var directory in Directory.EnumerateDirectories(currentDirectory))
+            {
+                var directoryName = Path.GetFileName(directory);
+                if (string.Equals(directoryName, ".git", StringComparison.Ordinal) || IsSymlink(directory))
+                {
+                    continue;
+                }
+
+                stack.Push(directory);
+            }
+
+            var gitIgnorePath = Path.Combine(currentDirectory, ".gitignore");
+            if (File.Exists(gitIgnorePath) && !IsSymlink(gitIgnorePath))
+            {
+                yield return gitIgnorePath;
+            }
+        }
+    }
+
+    private static IEnumerable<string> CollectRepositoryFiles(string repositoryRoot)
+    {
+        var stack = new Stack<string>();
+        stack.Push(repositoryRoot);
+
+        while (stack.Count > 0)
+        {
+            var currentDirectory = stack.Pop();
+
+            foreach (var directory in Directory.EnumerateDirectories(currentDirectory))
+            {
+                var directoryName = Path.GetFileName(directory);
+                if (string.Equals(directoryName, ".git", StringComparison.Ordinal) || IsSymlink(directory))
+                {
+                    continue;
+                }
+
+                stack.Push(directory);
+            }
+
+            foreach (var file in Directory.EnumerateFiles(currentDirectory))
+            {
+                if (IsSymlink(file))
+                {
+                    continue;
+                }
+
+                yield return Path.GetRelativePath(repositoryRoot, file).Replace('\\', '/');
+            }
+        }
+    }
+
+    private static bool IsSymlink(string path)
+    {
+        var attributes = File.GetAttributes(path);
+        return (attributes & FileAttributes.ReparsePoint) != 0;
     }
 
     private static string FindRepositoryRoot()
@@ -103,52 +186,5 @@ public class RepositoryTraversalBenchmarks
         }
 
         throw new InvalidOperationException($"Unable to locate the repository root from '{AppContext.BaseDirectory}'.");
-    }
-
-    private readonly record struct TraversalFrame(string FullPath, string RelativePath, bool IsDirectory);
-
-    private sealed class RepositoryComparisonEnumerator : FileSystemEnumerator<TraversalFrame>
-    {
-        private readonly string _relativeDirectory;
-        private readonly GitIgnore _ignore;
-
-        public RepositoryComparisonEnumerator(string directoryPath, string relativeDirectory, GitIgnore ignore)
-            : base(directoryPath, EnumerationOptions)
-        {
-            _relativeDirectory = relativeDirectory;
-            _ignore = ignore;
-        }
-
-        protected override bool ShouldIncludeEntry(ref FileSystemEntry entry)
-        {
-            if (entry.FileName.SequenceEqual(".git"))
-            {
-                return false;
-            }
-
-            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                return false;
-            }
-
-            var relativePath = CreateRelativePath(entry.FileName, entry.IsDirectory);
-            return !_ignore.IsPathIgnored(relativePath);
-        }
-
-        protected override TraversalFrame TransformEntry(ref FileSystemEntry entry)
-        {
-            var relativePath = CreateRelativePath(entry.FileName, isDirectory: false);
-            return new TraversalFrame(entry.ToFullPath(), relativePath, entry.IsDirectory);
-        }
-
-        private string CreateRelativePath(ReadOnlySpan<char> entryName, bool isDirectory)
-        {
-            var entryNameText = entryName.ToString();
-            var relativePath = _relativeDirectory.Length == 0
-                ? entryNameText
-                : string.Concat(_relativeDirectory, "/", entryNameText);
-
-            return isDirectory ? string.Concat(relativePath, "/") : relativePath;
-        }
     }
 }
