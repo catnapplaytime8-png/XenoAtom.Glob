@@ -11,7 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
           - windows-latest
           - macos-latest
 
@@ -41,13 +40,12 @@ jobs:
         shell: bash
         run: dotnet test src/XenoAtom.Glob.Tests/XenoAtom.Glob.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test-results.trx"
 
-      - name: Benchmark Smoke
-        shell: bash
-        run: dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --job short --warmupCount 1 --iterationCount 1 --filter "*.MatchLiteralPath" "*.EvaluateIgnoreDecision"
+  build_test_pack_publish:
+    needs: test
+    runs-on: 'ubuntu-latest'
 
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
+    steps:
+      - name: "Build, Test, Pack and Publish"
+        uses: xoofx/.github/.github/actions/dotnet-releaser-action@main
         with:
-          name: test-results-${{ matrix.os }}
-          path: src/XenoAtom.Glob.Tests/TestResults/**
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
