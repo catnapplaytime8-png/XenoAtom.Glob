@@ -117,5 +117,7 @@ The repository includes `src/XenoAtom.Glob.Benchmarks/` with BenchmarkDotNet ben
 - single-path glob matching
 - ignore evaluation
 - traversal with and without ignore pruning
+- traversal of the current repository root using the real `.gitignore` stack
+- comparison against `LibGit2Sharp.Ignore.IsPathIgnored` on the same repository traversal shape
 
 The latest recorded short-run snapshot is available in [benchmarks/latest.md](./benchmarks/latest.md).

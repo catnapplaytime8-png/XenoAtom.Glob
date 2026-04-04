@@ -14,6 +14,7 @@ A gitignore compatible glob library.
 - Reusable repository contexts that cache parsed and compiled repository ignore state across traversals
 - Tree walking with ignore-aware directory pruning and captured file metadata on `FileTreeEntry`
 - Differential tests against the Git CLI for compatibility-sensitive behavior
+- Benchmark coverage for synthetic corpora and real repository traversal against the working-tree ignore stack
 - Clear separation between ignore evaluation and tracked-file state from the Git index
 
 ## 🚀 Quick Example

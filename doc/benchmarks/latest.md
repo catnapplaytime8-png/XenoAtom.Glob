@@ -13,6 +13,7 @@ dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.cspro
 dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --job short --warmupCount 1 --iterationCount 1 --filter "*TraversalBenchmarks.EnumerateWithPrunedDirectories*"
 dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --job short --warmupCount 1 --iterationCount 1 --filter "*TraversalBenchmarks.EnumerateWhereAllRootEntriesAreSkipped*"
 dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --job short --warmupCount 1 --iterationCount 1 --filter "*TraversalBenchmarks.EnumerateRootEntriesWithRawRuntimeEnumerator*"
+dotnet run --project src/XenoAtom.Glob.Benchmarks/XenoAtom.Glob.Benchmarks.csproj -c Release -- --job short --warmupCount 1 --iterationCount 1 --filter "*RepositoryTraversalBenchmarks*"
 dotnet-trace collect --profile cpu-sampling --output <temp>.nettrace -- dotnet <temp-harness>\TraceHarness.dll
 ```
 
@@ -57,6 +58,13 @@ Raw runtime skipped-root baseline:
 | `Medium` | `54.25 us` | `128 B` |
 | `Large` | `106.42 us` | `128 B` |
 
+Current repository traversal results:
+
+| Benchmark | Mean | Allocated |
+| --- | ---: | ---: |
+| `RepositoryTraversalBenchmarks.EnumerateCurrentRepositoryWithGitIgnore` | `4.452 ms` | `52.06 KB` |
+| `RepositoryTraversalBenchmarks.EnumerateCurrentRepositoryWithLibGit2SharpIgnoreChecks` | `7.571 ms` | `73.57 KB` |
+
 Artifacts:
 
 - Raw BenchmarkDotNet reports are generated under `BenchmarkDotNet.Artifacts/results/`.
@@ -69,6 +77,7 @@ Notes:
 - The latest traversal tuning removed needless child rule-stack cloning when a directory has no local `.gitignore`, keeps relative ignore checks on a temporary span buffer before allocating emitted paths, and avoids materializing `FileName` strings for ignored entries.
 - Repository contexts now cache parsed ignore files by path plus file metadata, invalidate those cached parses when `.gitignore`, `.git/info/exclude`, or global exclude files change, and reuse the compiled repository-root ignore stack across repeated traversals when its ignore-file dependency metadata is unchanged.
 - The ignore matcher hot path now uses indexed loops instead of interface-typed `foreach` enumeration, removing boxed enumerator allocations from repeated rule evaluation.
+- The repository-root benchmark traverses this repository with the actual working-tree `.gitignore` stack, and the external comparison uses `LibGit2Sharp.Ignore.IsPathIgnored` on the same visible-file traversal shape rather than `git status`-style repository state computation.
 - Relative to the first short-run snapshot, `GlobBenchmarks.EvaluateIgnoreDecision` improved from `131.87 ns` / `472 B` to `61.14 ns` / `104 B`.
 - A profiler-backed traversal trace over a dedicated harness showed the dominant remaining work in `FileTreeWalker` enumeration, directory `.gitignore` existence checks (`File.Exists`, `RepositoryContext.TryLoadDirectoryRuleSet`, `RepositoryContext.CreateChildRuleSets`), and underlying handle open/close calls rather than in per-entry ignore evaluation alone.
 - The skipped-entry benchmark now uses repository-scoped excludes from `.git/info/exclude` so the root directory can be measured without a visible working-tree `.gitignore` entry, and the dedicated raw-runtime baseline shows the underlying one-level `FileSystemEnumerator<T>` floor at `128 B` while the library path remains flat at `440 B`, which closes the skipped-entry allocation gate.
