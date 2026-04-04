@@ -78,6 +78,27 @@ public class GlobPatternTests
     }
 
     [TestMethod]
+    public void IsMatch_ShouldBacktrackAcrossSingleSegmentStars()
+    {
+        Assert.IsTrue(GlobPattern.Parse("*test*").IsMatch("mytestfile"));
+        Assert.IsFalse(GlobPattern.Parse("*test*").IsMatch("mytoastfile"));
+
+        Assert.IsTrue(GlobPattern.Parse("a*b*c").IsMatch("axbyc"));
+        Assert.IsTrue(GlobPattern.Parse("a*b*c").IsMatch("abc"));
+        Assert.IsFalse(GlobPattern.Parse("a*b*c").IsMatch("acb"));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldHandleSingleEntryAndLiteralOpeningBracketCharacterClasses()
+    {
+        Assert.IsTrue(GlobPattern.Parse("file[a].txt").IsMatch("filea.txt"));
+        Assert.IsFalse(GlobPattern.Parse("file[a].txt").IsMatch("fileb.txt"));
+
+        Assert.IsTrue(GlobPattern.Parse("[[]").IsMatch("["));
+        Assert.IsFalse(GlobPattern.Parse("[[]").IsMatch("a"));
+    }
+
+    [TestMethod]
     public void Match_ShouldFoldCharacterClassesWhenComparisonIsIgnoreCase()
     {
         var upper = GlobParser.TryParse("[A-Z].txt", GlobParserOptions.IgnorePattern);
@@ -109,6 +130,16 @@ public class GlobPatternTests
         ReadOnlySpan<char> candidate = @"src\nested\file.txt";
 
         Assert.IsTrue(pattern.IsMatch(candidate));
+    }
+
+    [TestMethod]
+    public void IsMatch_ShouldTreatExplicitDirectoryFlagLikeTrailingSeparator()
+    {
+        var pattern = GlobPattern.Parse("src");
+
+        Assert.IsTrue(pattern.IsMatch("src", isDirectory: true));
+        Assert.IsTrue(pattern.IsMatch("src/"));
+        Assert.IsFalse(pattern.IsMatch("src/nested", isDirectory: true));
     }
 
     [TestMethod]
