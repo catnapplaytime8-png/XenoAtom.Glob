@@ -17,6 +17,9 @@ using XenoAtom.Glob;
 
 var pattern = GlobPattern.Parse("src/**/file.cs");
 var matches = pattern.IsMatch("src/nested/file.cs");
+
+ReadOnlySpan<char> spanPath = @"src\nested\file.cs";
+var spanMatches = pattern.IsMatch(spanPath);
 ```
 
 Supported glob features:
@@ -40,9 +43,19 @@ var rules = IgnoreRuleSet.ParseGitIgnore("""
 
 var matcher = new IgnoreMatcher(rules);
 var result = matcher.Evaluate("build/output.tmp");
+
+ReadOnlySpan<char> spanCandidate = @"build\output.tmp";
+var spanResult = matcher.Evaluate(spanCandidate);
 ```
 
 Later rule sets passed to `IgnoreMatcher` have higher precedence than earlier ones.
+
+For hot-path callers that already work with spans, the public APIs also accept `ReadOnlySpan<char>` for:
+
+- `GlobPattern.IsMatch(ReadOnlySpan<char>, bool)`
+- `IgnoreMatcher.Evaluate(ReadOnlySpan<char>, bool)`
+- `IgnoreRuleSet.ParseGitIgnore(ReadOnlySpan<char>, ...)`
+- `IgnoreRuleSet.Parse(ReadOnlySpan<char>, IgnoreDialect, ...)`
 
 For explicit dialect selection:
 
@@ -102,13 +115,14 @@ foreach (var entry in walker.Enumerate(repository.WorkingTreeRoot, new FileTreeW
 
 Traversal characteristics:
 
-- uses `FileSystemEnumerable<T>`
+- uses `FileSystemEnumerator<T>`
 - prunes ignored directories before descent
 - loads `.gitignore` lazily when entering directories
 - reuses cached parsed ignore files and repository-root ignore state through `RepositoryContext` when file metadata is unchanged
 - exposes captured `FileSystemEntry`-style metadata such as `Attributes`, `Length`, and UTC timestamps on `FileTreeEntry`
 - does not follow reparse points or symbolic links by default
 - supports cancellation through `FileTreeWalkOptions.CancellationToken`
+- snapshots the init-only `FileTreeWalkOptions` values and additional rule-set list when enumeration starts
 
 ## Benchmarks
 

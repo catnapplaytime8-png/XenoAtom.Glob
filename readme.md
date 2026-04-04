@@ -12,6 +12,7 @@ A gitignore compatible glob library.
 - Repository discovery for `.git` directories and gitfiles
 - Repository-aware ignore matching that honors `core.ignorecase`
 - Reusable repository contexts that cache parsed and compiled repository ignore state across traversals
+- Public `ReadOnlySpan<char>` overloads for glob matching, ignore evaluation, and ignore-file parsing
 - Tree walking with ignore-aware directory pruning and captured file metadata on `FileTreeEntry`
 - Differential tests against the Git CLI for compatibility-sensitive behavior
 - Benchmark coverage for synthetic corpora and real repository traversal against the working-tree ignore stack
@@ -38,6 +39,7 @@ var ignoreRuleSet = IgnoreRuleSet.Parse("""
     """, IgnoreDialect.IgnoreFile);
 var ignoreMatcher = new IgnoreMatcher(ruleSet);
 var ignored = ignoreMatcher.Evaluate("build/output.tmp").IsIgnored;
+var spanIgnored = ignoreMatcher.Evaluate(@"build\output.tmp".AsSpan()).IsIgnored;
 
 var repository = RepositoryDiscovery.Discover(@"C:\code\my-repo");
 var walker = new FileTreeWalker();
