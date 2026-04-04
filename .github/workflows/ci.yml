@@ -2,6 +2,11 @@ name: ci
 
 on:
   push:
+    paths-ignore:
+    - 'doc/**'
+    - 'img/**'
+    - '*.md'
+    - '*.txt'
   pull_request:
 
 jobs:
