@@ -1,6 +1,6 @@
 # XenoAtom.Glob [![ci](https://github.com/XenoAtom/XenoAtom.Glob/actions/workflows/ci.yml/badge.svg)](https://github.com/XenoAtom/XenoAtom.Glob/actions/workflows/ci.yml) [![NuGet](https://img.shields.io/nuget/v/XenoAtom.Glob.svg)](https://www.nuget.org/packages/XenoAtom.Glob/)
 
-<img align="right" width="160px" height="160px" src="https://raw.githubusercontent.com/xoofx/XenoAtom.Glob/main/img/XenoAtom.Glob.png">
+<img align="right" width="160px" height="160px" src="https://raw.githubusercontent.com/XenoAtom/XenoAtom.Glob/main/img/XenoAtom.Glob.png">
 
 A high-performance .NET glob library with gitignore compatibility.
 
