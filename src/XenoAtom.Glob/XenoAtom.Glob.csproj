@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Description>A gitignore compatible glob library</Description>
+    <Description>A high-performance .NET glob library with gitignore compatibility.</Description>
     <Copyright>Alexandre Mutel</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
     <Authors>Alexandre Mutel</Authors>
@@ -19,6 +19,8 @@
     <PackageIcon>XenoAtom.Glob.png</PackageIcon>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageProjectUrl>https://github.com/xoofx/XenoAtom.Glob</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/xoofx/XenoAtom.Glob</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
     <!--Add support for sourcelink-->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>

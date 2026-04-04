@@ -1,8 +1,8 @@
-# XenoAtom.Glob [![ci](https://github.com/xoofx/XenoAtom.Glob/actions/workflows/ci.yml/badge.svg)](https://github.com/xoofx/XenoAtom.Glob/actions/workflows/ci.yml) [![NuGet](https://img.shields.io/nuget/v/XenoAtom.Glob.svg)](https://www.nuget.org/packages/XenoAtom.Glob/)
+# XenoAtom.Glob [![ci](https://github.com/XenoAtom/XenoAtom.Glob/actions/workflows/ci.yml/badge.svg)](https://github.com/XenoAtom/XenoAtom.Glob/actions/workflows/ci.yml) [![NuGet](https://img.shields.io/nuget/v/XenoAtom.Glob.svg)](https://www.nuget.org/packages/XenoAtom.Glob/)
 
 <img align="right" width="160px" height="160px" src="https://raw.githubusercontent.com/xoofx/XenoAtom.Glob/main/img/XenoAtom.Glob.png">
 
-A gitignore compatible glob library.
+A high-performance .NET glob library with gitignore compatibility.
 
 ## ✨ Features
 
@@ -18,6 +18,7 @@ A gitignore compatible glob library.
 - Differential tests against the Git CLI for compatibility-sensitive behavior
 - Benchmark coverage for synthetic corpora and real repository traversal against the working-tree ignore stack
 - Clear separation between ignore evaluation and tracked-file state from the Git index
+- `net10`+ compatible and NativeAOT ready
 
 ## 🚀 Quick Example
 
@@ -57,7 +58,7 @@ foreach (var entry in walker.Enumerate(repository.WorkingTreeRoot, new FileTreeW
 
 ## 📖 User Guide
 
-For more details on how to use XenoAtom.Glob, please visit the [user guide](https://github.com/xoofx/XenoAtom.Glob/blob/main/doc/readme.md).
+For more details on how to use XenoAtom.Glob, please visit the [user guide](https://github.com/XenoAtom/XenoAtom.Glob/blob/main/doc/readme.md).
 
 ## Thread Safety
 

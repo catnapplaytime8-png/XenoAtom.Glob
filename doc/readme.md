@@ -1,6 +1,6 @@
 # XenoAtom.Glob User Guide
 
-A gitignore compatible glob library.
+A high-performance .NET glob library with gitignore compatibility.
 
 ## What It Provides
 

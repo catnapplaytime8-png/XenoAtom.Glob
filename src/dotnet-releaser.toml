@@ -3,5 +3,7 @@
 [msbuild]
 project = "XenoAtom.Glob.slnx"
 [github]
-user = "xoofx"
+user = "XenoAtom"
 repo = "XenoAtom.Glob"
+[changelog]
+owners = ["xoofx"] # To avoid to be mentioned in the changelog
