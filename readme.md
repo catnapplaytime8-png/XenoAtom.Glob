@@ -4,23 +4,21 @@
 
 A high-performance .NET glob library with gitignore compatibility.
 
-## ✨ Features
+## What It Is For
 
-- Compiled glob patterns with `*`, `?`, character classes, escapes, and `**`
-- Git-compatible ignore parsing and layered evaluation
-- Explicit ignore dialect selection for `.gitignore` and `.ignore`
-- Repository discovery for `.git` directories and gitfiles
-- Repository-aware ignore matching that honors `core.ignorecase`
-- Reusable repository contexts that cache parsed and compiled repository ignore state across traversals
-- Public `ReadOnlySpan<char>` overloads for glob matching, ignore evaluation, and ignore-file parsing
-- Reusable `IgnoreMatcherEvaluator` instances for allocation-free repeated ignore checks
-- Tree walking with ignore-aware directory pruning and captured file metadata on `FileTreeEntry`
-- Differential tests against the Git CLI for compatibility-sensitive behavior
-- Benchmark coverage for synthetic corpora and real repository traversal against the working-tree ignore stack
-- Clear separation between ignore evaluation and tracked-file state from the Git index
-- `net10`+ compatible and NativeAOT ready
+XenoAtom.Glob gives you three focused building blocks:
 
-## 🚀 Quick Example
+- `GlobPattern` to match relative paths against compiled glob patterns
+- `IgnoreRuleSet` and `IgnoreMatcher` to evaluate `.gitignore`-style rules
+- `RepositoryDiscovery` and `FileTreeWalker` to walk a Git working tree while honoring ignore files
+
+## Install
+
+```bash
+dotnet add package XenoAtom.Glob
+```
+
+## Quick Start
 
 ```csharp
 using XenoAtom.Glob;
@@ -29,24 +27,24 @@ using XenoAtom.Glob.IO;
 using XenoAtom.Glob.Ignore;
 
 var pattern = GlobPattern.Parse("src/**/file.cs");
-var matches = pattern.IsMatch("src/nested/file.cs");
+Console.WriteLine(pattern.IsMatch("src/nested/file.cs"));   // true
+Console.WriteLine(pattern.IsMatch(@"src\nested\file.cs"));  // true
 
-var ruleSet = IgnoreRuleSet.ParseGitIgnore("""
+var rules = IgnoreRuleSet.ParseGitIgnore("""
     *.tmp
-    build/
-    !build/keep.tmp
+    generated/*
+    !generated/include.txt
     """);
-var ignoreRuleSet = IgnoreRuleSet.Parse("""
-    *.cache
-    """, IgnoreDialect.IgnoreFile);
-var ignoreMatcher = new IgnoreMatcher(ruleSet);
-var ignored = ignoreMatcher.Evaluate("build/output.tmp").IsIgnored;
-var spanIgnored = ignoreMatcher.Evaluate(@"build\output.tmp".AsSpan()).IsIgnored;
-using var ignoreEvaluator = ignoreMatcher.CreateEvaluator();
-var hotPathIgnored = ignoreEvaluator.Evaluate("build/output.tmp").IsIgnored;
+
+var matcher = new IgnoreMatcher(rules);
+Console.WriteLine(matcher.Evaluate("file.tmp").IsIgnored);               // true
+Console.WriteLine(matcher.Evaluate("generated/code.cs").IsIgnored);      // true
+Console.WriteLine(matcher.Evaluate("generated/include.txt").IsIgnored);  // false
+Console.WriteLine(matcher.Evaluate("generated", isDirectory: true).IsIgnored); // false
 
 var repository = RepositoryDiscovery.Discover(@"C:\code\my-repo");
 var walker = new FileTreeWalker();
+
 foreach (var entry in walker.Enumerate(repository.WorkingTreeRoot, new FileTreeWalkOptions
 {
     RepositoryContext = repository,
@@ -56,21 +54,55 @@ foreach (var entry in walker.Enumerate(repository.WorkingTreeRoot, new FileTreeW
 }
 ```
 
-## 📖 User Guide
+## Path Rules
 
-For more details on how to use XenoAtom.Glob, please visit the [user guide](https://github.com/XenoAtom/XenoAtom.Glob/blob/main/doc/readme.md).
+- Public matching APIs work with relative paths, not absolute paths.
+- Both `/` and `\` are accepted as input path separators.
+- Returned relative paths are normalized to `/`.
+- `..` segments are rejected.
+- When you evaluate a directory directly, pass `isDirectory: true`.
+- `FileTreeWalker` handles directory detection for you.
+
+## Which API Should I Use?
+
+- Use `GlobPattern` when you only need pattern matching.
+- Use `IgnoreMatcher` when you already have ignore file content and want `.gitignore` semantics.
+- Use `RepositoryDiscovery` plus `FileTreeWalker` when you want Git-aware traversal of a real working tree.
+
+## Case Sensitivity
+
+- `GlobPattern` matching is case-sensitive.
+- Standalone `IgnoreMatcher` uses the current platform default path comparison.
+- Repository-aware traversal uses the repository's `core.ignorecase` value when available.
+
+## Git Compatibility Scope
+
+Repository-aware APIs handle:
+
+- `.gitignore` files from the repository root down to the current directory
+- `.git/info/exclude`
+- `core.excludesFile`
+- `.git` directories and gitfiles
+- nested checked-out repositories and submodules as traversal boundaries
+
+Intentionally out of scope:
+
+- tracked-file state from the Git index
+
+## User Guide
+
+The full guide is in [doc/readme.md](doc/readme.md).
 
 ## Thread Safety
 
-- `GlobPattern`, `IgnoreRule`, `IgnoreRuleSet`, `IgnoreMatcher`, `RepositoryContext`, `FileTreeWalkOptions`, `FileTreeEntry`, and parse/evaluation result values are immutable or internally synchronized and can be shared across threads.
-- `RepositoryDiscovery` is stateless and can be called concurrently.
-- `FileTreeWalker` instances can start multiple concurrent traversals, but each returned enumeration should be consumed by only one thread at a time.
-- `IgnoreMatcherEvaluator` is intentionally reusable but not thread-safe. Create one evaluator per concurrent worker and dispose it when that worker is done.
+- `GlobPattern`, `IgnoreRule`, `IgnoreRuleSet`, `IgnoreMatcher`, `RepositoryContext`, `FileTreeWalkOptions`, and `FileTreeEntry` are safe to share.
+- `IgnoreMatcherEvaluator` is reusable but not thread-safe.
+- `FileTreeWalker` can start multiple enumerations, but each individual enumeration should be consumed by one thread at a time.
 
-## 🪪 License
+## License
 
-This software is released under the [BSD-2-Clause license](https://opensource.org/licenses/BSD-2-Clause). 
+This software is released under the [BSD-2-Clause license](https://opensource.org/licenses/BSD-2-Clause).
 
-## 🤗 Author
+## Author
 
 Alexandre Mutel aka [xoofx](https://xoofx.github.io).
