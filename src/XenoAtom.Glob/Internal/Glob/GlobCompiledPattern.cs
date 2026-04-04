@@ -161,15 +161,18 @@ internal sealed class GlobCompiledPattern
 
         var segmentIndex = 0;
         var start = 0;
-        for (var index = 0; index <= path.Length; index++)
+        while (true)
         {
-            if (index < path.Length && path[index] != '/')
+            var separatorIndex = path[start..].IndexOf('/');
+            if (separatorIndex < 0)
             {
-                continue;
+                segments[segmentIndex] = new SegmentRange(start, path.Length - start);
+                return;
             }
 
-            segments[segmentIndex++] = new SegmentRange(start, index - start);
-            start = index + 1;
+            var absoluteSeparatorIndex = start + separatorIndex;
+            segments[segmentIndex++] = new SegmentRange(start, absoluteSeparatorIndex - start);
+            start = absoluteSeparatorIndex + 1;
         }
     }
 }

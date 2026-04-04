@@ -125,18 +125,23 @@ public sealed class IgnoreMatcher
 
     internal IgnoreEvaluationResult EvaluateNormalized(ReadOnlySpan<char> normalizedPath, bool isDirectory, IgnoreMatcherEvaluator? evaluator)
     {
-        for (var index = 0; index < normalizedPath.Length; index++)
+        var offset = 0;
+        while (offset < normalizedPath.Length)
         {
-            if (normalizedPath[index] != '/')
+            var separatorIndex = normalizedPath[offset..].IndexOf('/');
+            if (separatorIndex < 0)
             {
-                continue;
+                break;
             }
 
-            var directoryDecision = EvaluateSinglePath(normalizedPath[..index], isDirectory: true, trace: null, evaluator);
+            separatorIndex += offset;
+            var directoryDecision = EvaluateSinglePath(normalizedPath[..separatorIndex], isDirectory: true, trace: null, evaluator);
             if (directoryDecision.IsMatch && directoryDecision.IsIgnored)
             {
                 return directoryDecision;
             }
+
+            offset = separatorIndex + 1;
         }
 
         return EvaluateSinglePath(normalizedPath, isDirectory, trace: null, evaluator);
@@ -162,18 +167,23 @@ public sealed class IgnoreMatcher
     {
         List<IgnoreRule>? trace = captureTrace ? [] : null;
         var path = normalizedPath.Value.AsSpan();
-        for (var index = 0; index < path.Length; index++)
+        var offset = 0;
+        while (offset < path.Length)
         {
-            if (path[index] != '/')
+            var separatorIndex = path[offset..].IndexOf('/');
+            if (separatorIndex < 0)
             {
-                continue;
+                break;
             }
 
-            var directoryDecision = EvaluateSinglePath(path[..index], isDirectory: true, trace, evaluator: null);
+            separatorIndex += offset;
+            var directoryDecision = EvaluateSinglePath(path[..separatorIndex], isDirectory: true, trace, evaluator: null);
             if (directoryDecision.IsMatch && directoryDecision.IsIgnored)
             {
                 return new IgnoreEvaluationTrace(directoryDecision, trace ?? []);
             }
+
+            offset = separatorIndex + 1;
         }
 
         return new IgnoreEvaluationTrace(EvaluateSinglePath(path, normalizedPath.IsDirectory, trace, evaluator: null), trace ?? []);

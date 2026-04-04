@@ -89,15 +89,17 @@ internal static class IgnoreRuleMatcher
     private static int CountSegments(ReadOnlySpan<char> path)
     {
         var segmentCount = 1;
-        for (var index = 0; index < path.Length; index++)
+        while (true)
         {
-            if (path[index] == '/')
+            var separatorIndex = path.IndexOf('/');
+            if (separatorIndex < 0)
             {
-                segmentCount++;
+                return segmentCount;
             }
-        }
 
-        return segmentCount;
+            segmentCount++;
+            path = path[(separatorIndex + 1)..];
+        }
     }
 
     private static bool MatchesBoundaryDirectoryOnly(

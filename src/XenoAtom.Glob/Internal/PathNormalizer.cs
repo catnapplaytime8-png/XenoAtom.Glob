@@ -9,6 +9,7 @@ namespace XenoAtom.Glob.Internal;
 internal static class PathNormalizer
 {
     private const int StackallocThreshold = 256;
+    private static readonly SearchValues<char> Separators = SearchValues.Create("/\\");
 
     public static NormalizedPath NormalizeRelativePath(string path, bool isDirectory = false)
     {
@@ -50,52 +51,13 @@ internal static class PathNormalizer
 
         try
         {
-            var written = 0;
-            var segmentStart = 0;
-            var segmentLength = 0;
-
-            for (var index = 0; index <= path.Length; index++)
+            if (!TryNormalizeIntoDestination(path, destination, out var written, out var segmentCount, out var error))
             {
-                if (index < path.Length && !IsSeparator(path[index]))
-                {
-                    if (segmentLength == 0)
-                    {
-                        segmentStart = index;
-                    }
-
-                    segmentLength++;
-                    continue;
-                }
-
-                if (segmentLength == 0)
-                {
-                    continue;
-                }
-
-                var segment = path.AsSpan(segmentStart, segmentLength);
-                if (segment.SequenceEqual("."))
-                {
-                    segmentLength = 0;
-                    continue;
-                }
-
-                if (segment.SequenceEqual(".."))
-                {
-                    return PathNormalizationResult.Failure(PathNormalizationError.ParentDirectorySegmentsNotSupported);
-                }
-
-                if (written > 0)
-                {
-                    destination[written++] = '/';
-                }
-
-                segment.CopyTo(destination[written..]);
-                written += segment.Length;
-                segmentLength = 0;
+                return PathNormalizationResult.Failure(error);
             }
 
             var normalizedValue = written == 0 ? string.Empty : new string(destination[..written]);
-            return PathNormalizationResult.FromPath(new NormalizedPath(normalizedValue, inferredDirectory, CountSegments(normalizedValue)));
+            return PathNormalizationResult.FromPath(new NormalizedPath(normalizedValue, inferredDirectory, segmentCount));
         }
         finally
         {
@@ -147,108 +109,29 @@ internal static class PathNormalizer
             return true;
         }
 
-        var written = 0;
-        var currentSegmentCount = 0;
-        var segmentStart = 0;
-        var segmentLength = 0;
-
-        for (var index = 0; index <= path.Length; index++)
+        if (!TryNormalizeIntoDestination(path, destination, out var written, out segmentCount, out error))
         {
-            if (index < path.Length && !IsSeparator(path[index]))
-            {
-                if (segmentLength == 0)
-                {
-                    segmentStart = index;
-                }
-
-                segmentLength++;
-                continue;
-            }
-
-            if (segmentLength == 0)
-            {
-                continue;
-            }
-
-            var segment = path.Slice(segmentStart, segmentLength);
-            if (segment.SequenceEqual("."))
-            {
-                segmentLength = 0;
-                continue;
-            }
-
-            if (segment.SequenceEqual(".."))
-            {
-                normalizedPath = default;
-                normalizedIsDirectory = default;
-                segmentCount = 0;
-                error = PathNormalizationError.ParentDirectorySegmentsNotSupported;
-                return false;
-            }
-
-            if (written > 0)
-            {
-                destination[written++] = '/';
-            }
-
-            segment.CopyTo(destination[written..]);
-            written += segment.Length;
-            currentSegmentCount++;
-            segmentLength = 0;
+            normalizedPath = default;
+            normalizedIsDirectory = default;
+            segmentCount = 0;
+            return false;
         }
 
         normalizedPath = destination[..written];
-        segmentCount = currentSegmentCount;
-        error = PathNormalizationError.None;
         return true;
     }
 
     private static bool TryReturnUnchangedPath(string path, bool inferredDirectory, out PathNormalizationResult result)
     {
-        if (EndsWithSeparator(path))
+        if (!TryReturnUnchangedPath(path.AsSpan(), out var segmentCount, out var error))
         {
             result = default;
             return false;
         }
 
-        var segmentLength = 0;
-        for (var index = 0; index <= path.Length; index++)
-        {
-            if (index < path.Length && !IsSeparator(path[index]))
-            {
-                segmentLength++;
-                continue;
-            }
-
-            if (segmentLength == 0)
-            {
-                result = default;
-                return false;
-            }
-
-            var segment = path.AsSpan(index - segmentLength, segmentLength);
-            if (segment.SequenceEqual("."))
-            {
-                result = default;
-                return false;
-            }
-
-            if (segment.SequenceEqual(".."))
-            {
-                result = PathNormalizationResult.Failure(PathNormalizationError.ParentDirectorySegmentsNotSupported);
-                return true;
-            }
-
-            if (index < path.Length && path[index] == '\\')
-            {
-                result = default;
-                return false;
-            }
-
-            segmentLength = 0;
-        }
-
-        result = PathNormalizationResult.FromPath(new NormalizedPath(path, inferredDirectory, CountSegments(path)));
+        result = error == PathNormalizationError.None
+            ? PathNormalizationResult.FromPath(new NormalizedPath(path, inferredDirectory, segmentCount))
+            : PathNormalizationResult.Failure(error);
         return true;
     }
 
@@ -261,50 +144,50 @@ internal static class PathNormalizer
             return false;
         }
 
-        var currentSegmentCount = 0;
-        var currentSegmentLength = 0;
-        for (var index = 0; index <= path.Length; index++)
+        segmentCount = 0;
+        var remaining = path;
+        while (!remaining.IsEmpty)
         {
-            if (index < path.Length && !IsSeparator(path[index]))
-            {
-                currentSegmentLength++;
-                continue;
-            }
-
-            if (currentSegmentLength == 0)
+            var separatorIndex = remaining.IndexOfAny(Separators);
+            var segment = separatorIndex < 0 ? remaining : remaining[..separatorIndex];
+            if (segment.IsEmpty)
             {
                 segmentCount = 0;
                 error = PathNormalizationError.None;
                 return false;
             }
 
-            var segment = path.Slice(index - currentSegmentLength, currentSegmentLength);
-            if (segment.SequenceEqual("."))
+            if (IsCurrentDirectorySegment(segment))
             {
                 segmentCount = 0;
                 error = PathNormalizationError.None;
                 return false;
             }
 
-            if (segment.SequenceEqual(".."))
+            if (IsParentDirectorySegment(segment))
             {
                 segmentCount = 0;
                 error = PathNormalizationError.ParentDirectorySegmentsNotSupported;
                 return true;
             }
 
-            if (index < path.Length && path[index] == '\\')
+            segmentCount++;
+            if (separatorIndex < 0)
+            {
+                error = PathNormalizationError.None;
+                return true;
+            }
+
+            if (remaining[separatorIndex] == '\\')
             {
                 segmentCount = 0;
                 error = PathNormalizationError.None;
                 return false;
             }
 
-            currentSegmentCount++;
-            currentSegmentLength = 0;
+            remaining = remaining[(separatorIndex + 1)..];
         }
 
-        segmentCount = currentSegmentCount;
         error = PathNormalizationError.None;
         return true;
     }
@@ -317,15 +200,17 @@ internal static class PathNormalizer
         }
 
         var count = 1;
-        for (var index = 0; index < path.Length; index++)
+        while (true)
         {
-            if (path[index] == '/')
+            var separatorIndex = path.IndexOf('/');
+            if (separatorIndex < 0)
             {
-                count++;
+                return count;
             }
-        }
 
-        return count;
+            count++;
+            path = path[(separatorIndex + 1)..];
+        }
     }
 
     private static string GetErrorMessage(PathNormalizationError error) => error switch
@@ -340,6 +225,61 @@ internal static class PathNormalizer
     private static bool EndsWithSeparator(ReadOnlySpan<char> path) => path.Length > 0 && IsSeparator(path[^1]);
 
     private static bool IsSeparator(char c) => c is '/' or '\\';
+
+    private static bool TryNormalizeIntoDestination(
+        ReadOnlySpan<char> path,
+        Span<char> destination,
+        out int written,
+        out int segmentCount,
+        out PathNormalizationError error)
+    {
+        written = 0;
+        segmentCount = 0;
+        var remaining = path;
+
+        while (!remaining.IsEmpty)
+        {
+            var separatorIndex = remaining.IndexOfAny(Separators);
+            var segment = separatorIndex < 0 ? remaining : remaining[..separatorIndex];
+            if (!segment.IsEmpty)
+            {
+                if (IsCurrentDirectorySegment(segment))
+                {
+                    goto NextSegment;
+                }
+
+                if (IsParentDirectorySegment(segment))
+                {
+                    error = PathNormalizationError.ParentDirectorySegmentsNotSupported;
+                    return false;
+                }
+
+                if (written > 0)
+                {
+                    destination[written++] = '/';
+                }
+
+                segment.CopyTo(destination[written..]);
+                written += segment.Length;
+                segmentCount++;
+            }
+
+        NextSegment:
+            if (separatorIndex < 0)
+            {
+                break;
+            }
+
+            remaining = remaining[(separatorIndex + 1)..];
+        }
+
+        error = PathNormalizationError.None;
+        return true;
+    }
+
+    private static bool IsCurrentDirectorySegment(ReadOnlySpan<char> segment) => segment.Length == 1 && segment[0] == '.';
+
+    private static bool IsParentDirectorySegment(ReadOnlySpan<char> segment) => segment.Length == 2 && segment[0] == '.' && segment[1] == '.';
 
     private static bool IsAbsolutePath(string path)
     {
