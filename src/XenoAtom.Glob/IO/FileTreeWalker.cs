@@ -115,6 +115,11 @@ public sealed class FileTreeWalker
                     yield return yieldedEntry;
                 }
 
+                if (entry.IsNestedRepositoryBoundary)
+                {
+                    continue;
+                }
+
                 var childIgnoreStack = ignoreStack.PushDirectory(repositoryContext, relativePath);
                 foreach (var childEntry in EnumerateCore(
                     fullPath,
@@ -237,6 +242,17 @@ public sealed class FileTreeWalker
         }
     }
 
+    private static bool IsNestedRepositoryBoundary(string directoryPath, RepositoryContext? repositoryContext)
+    {
+        if (repositoryContext is null)
+        {
+            return false;
+        }
+
+        var dotGitPath = Path.Combine(directoryPath, ".git");
+        return Directory.Exists(dotGitPath) || File.Exists(dotGitPath);
+    }
+
     private readonly record struct RawFileSystemEntry(
         string Name,
         bool IsDirectory,
@@ -245,7 +261,8 @@ public sealed class FileTreeWalker
         DateTimeOffset CreationTimeUtc,
         DateTimeOffset LastAccessTimeUtc,
         DateTimeOffset LastWriteTimeUtc,
-        bool IsHidden);
+        bool IsHidden,
+        bool IsNestedRepositoryBoundary);
 
     private sealed class DirectoryEnumerable : IEnumerable<RawFileSystemEntry>
     {
@@ -282,6 +299,7 @@ public sealed class FileTreeWalker
 
     private sealed class DirectoryEnumerator : FileSystemEnumerator<RawFileSystemEntry>
     {
+        private readonly string _directoryPath;
         private readonly string _relativeDirectory;
         private readonly IgnoreMatcher _ignoreMatcher;
         private readonly RepositoryContext? _repositoryContext;
@@ -295,6 +313,7 @@ public sealed class FileTreeWalker
             bool followSymbolicLinks)
             : base(directoryPath, DirectoryEnumerationOptions)
         {
+            _directoryPath = directoryPath;
             _relativeDirectory = relativeDirectory;
             _ignoreMatcher = ignoreMatcher;
             _repositoryContext = repositoryContext;
@@ -313,6 +332,7 @@ public sealed class FileTreeWalker
                 entry.CreationTimeUtc,
                 entry.LastAccessTimeUtc,
                 entry.LastWriteTimeUtc,
-                entry.IsHidden);
+                entry.IsHidden,
+                entry.IsDirectory && IsNestedRepositoryBoundary(Path.Join(_directoryPath, entry.FileName.ToString()), _repositoryContext));
     }
 }

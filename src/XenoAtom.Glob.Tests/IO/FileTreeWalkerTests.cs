@@ -400,6 +400,67 @@ public class FileTreeWalkerTests
         CollectionAssert.AreEqual(new[] { "real", "real/file.txt" }, entries);
     }
 
+    [TestMethod]
+    public void Enumerate_ShouldTreatNestedGitRepositoryAsOpaqueDirectory()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var git = GitCli.In(tempDirectory.Path);
+        git.RunChecked("init", "--quiet");
+
+        tempDirectory.WriteAllText("root.txt", string.Empty);
+        tempDirectory.CreateDirectory("nested");
+        tempDirectory.WriteAllText("nested/child.txt", string.Empty);
+        tempDirectory.WriteAllText("nested/.gitignore", "ignored.txt\n");
+        tempDirectory.WriteAllText("nested/ignored.txt", string.Empty);
+
+        var nestedGit = GitCli.In(tempDirectory.GetPath("nested"));
+        nestedGit.RunChecked("init", "--quiet");
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.Path);
+        var entries = walker.Enumerate(tempDirectory.Path, new FileTreeWalkOptions
+        {
+            IncludeDirectories = true,
+            RepositoryContext = context,
+        })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { "nested", "root.txt" }, entries);
+    }
+
+    [TestMethod]
+    public void Enumerate_ShouldTreatCheckedOutSubmoduleAsOpaqueDirectory()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        tempDirectory.CreateDirectory("child-source");
+
+        var childGit = GitCli.In(tempDirectory.GetPath("child-source"));
+        childGit.RunChecked("init", "--quiet");
+        tempDirectory.WriteAllText("child-source/file.txt", string.Empty);
+        childGit.RunChecked("add", "file.txt");
+        childGit.RunChecked("-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-m", "init", "--quiet");
+
+        tempDirectory.CreateDirectory("outer");
+        var outerGit = GitCli.In(tempDirectory.GetPath("outer"));
+        outerGit.RunChecked("init", "--quiet");
+        outerGit.RunChecked("-c", "protocol.file.allow=always", "submodule", "add", "--quiet", tempDirectory.GetPath("child-source"), "sub");
+
+        var walker = new FileTreeWalker();
+        var context = RepositoryDiscovery.Discover(tempDirectory.GetPath("outer"));
+        var entries = walker.Enumerate(tempDirectory.GetPath("outer"), new FileTreeWalkOptions
+        {
+            IncludeDirectories = true,
+            RepositoryContext = context,
+        })
+            .Select(static x => x.RelativePath)
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(new[] { ".gitmodules", "sub" }, entries);
+    }
+
     private static string[] QueryVisiblePathsFromGit(GitCli git, IReadOnlyList<string> paths)
     {
         var input = string.Join('\0', paths) + '\0';
